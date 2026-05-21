@@ -1,23 +1,24 @@
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
-// enum Role {
-//   TEACHER
-//   STUDENT
-// }
+enum Role {
+  TEACHER
+  STUDENT
+}
 
-// enum Topic {
-//   ARITHMETIC
-//   ALGEBRA
-//   GEOMETRY
-//   FRACTIONS
-//   STATISTICS
-// }
+enum Topic {
+  ARITHMETIC
+  ALGEBRA
+  GEOMETRY
+  FRACTIONS
+  STATISTICS
+}
 
 //the student
 model User {
