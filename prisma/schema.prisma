@@ -1,0 +1,83 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  TEACHER
+  STUDENT
+}
+
+enum Topic {
+  ARITHMETIC
+  ALGEBRA
+  GEOMETRY
+  FRACTIONS
+  STATISTICS
+}
+
+//the student
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String
+  displayName String
+  // role: "TEACHER" | "STUDENT"
+  role        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Teacher creates problems
+  problems      Problem[] @relation("TeacherProblems")
+
+  // Self-relation: Teacher has many Students
+  students    User[]   @relation("TeacherStudents")
+  teacher     User?    @relation("TeacherStudents", fields: [teacherId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  teacherId   String?
+
+  // Student submits answers
+  submissions Submission[]
+}
+
+model Problem {
+  id            String   @id @default(cuid())
+  title         String
+  description   String
+  // topic: "ARITHMETIC" | "ALGEBRA" | "GEOMETRY" | "FRACTIONS" | "STATISTICS"
+  topic       String
+  difficulty    Int
+  ageGroup      String
+  correctAnswer String
+  hints         String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  //Relations
+  createdBy     User     @relation("TeacherProblems", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdById   String  
+  submissions   Submission[]
+}
+
+model Submission {
+  id            String   @id @default(cuid())
+  answer        String
+  isCorrect     Boolean
+  timeTaken     Int
+  aiFeedback    String?
+  hintsUsed     Int       @default(0)
+  attemptNumber Int       @default(1)
+  createdAt     DateTime @default(now())
+
+  //Relations
+  // Student relation
+  student       User     @relation(fields: [studentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  studentId     String
+
+  // Problem relation
+  problem     Problem  @relation(fields: [problemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  problemId     String
+}
