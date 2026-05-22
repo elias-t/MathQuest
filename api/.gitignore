@@ -1,26 +1,23 @@
 # Dependencies
 node_modules/
-**/node_modules/
+frontend/node_modules/
 
 # Environment files
 .env
 .env.local
-**/.env
+api/.env
 
 # Build outputs
 dist/
 build/
 
-# Python
-venv/
-**/venv/
-__pycache__/
-**/__pycache__/
-*.pyc
-*.pyo
-
 # Prisma
 api/prisma/migrations/*.sql
+
+# Python
+ai-service/venv/
+__pycache__/
+*.pyc
 
 # IDE
 .vs/
@@ -28,4 +25,4 @@ api/prisma/migrations/*.sql
 *.user
 
 # Logs
-*.log
+*.logc
