@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AiService } from '../ai/ai.service';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 
 @Injectable()
 export class SubmissionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private aiService: AiService,
+  ) {}
 
   async create(dto: CreateSubmissionDto, studentId: string) {
     const problem = await this.prisma.problem.findUnique({
@@ -12,8 +16,19 @@ export class SubmissionsService {
     });
     if (!problem) throw new NotFoundException('Problem not found');
 
-    const isCorrect =
-      dto.answer.trim().toLowerCase() === problem.correctAnswer.trim().toLowerCase();
+    const aiResult = await this.aiService.validateAnswer(
+      problem.description,
+      dto.answer,
+      problem.correctAnswer,
+    );
+
+    const isCorrect = aiResult
+      ? aiResult.is_correct
+      : dto.answer.trim().toLowerCase() === problem.correctAnswer.trim().toLowerCase();
+
+    const aiFeedback = aiResult
+      ? `${aiResult.feedback} ${aiResult.encouragement}`.trim()
+      : null;
 
     const previousAttempts = await this.prisma.submission.count({
       where: { problemId: dto.problemId, studentId },
@@ -24,6 +39,7 @@ export class SubmissionsService {
         answer: dto.answer,
         timeTaken: dto.timeTaken,
         isCorrect,
+        aiFeedback,
         attemptNumber: previousAttempts + 1,
         problemId: dto.problemId,
         studentId,
