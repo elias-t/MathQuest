@@ -8,6 +8,11 @@ interface ValidationResult {
   encouragement: string;
 }
 
+interface HintResult {
+  hint: string;
+  hint_level: number;
+}
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -30,7 +35,25 @@ export class AiService {
       );
       return response.data;
     } catch (error) {
-      this.logger.error('AI validation failed', error.message);
+      this.logger.error('AI validation failed', (error as Error).message);
+      return null;
+    }
+  }
+
+  async getHint(
+    problem: string,
+    previousHints: string[],
+  ): Promise<HintResult | null> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(`${this.aiUrl}/hint`, {
+          problem,
+          previous_hints: previousHints,
+        }),
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.error('AI hint failed', (error as Error).message);
       return null;
     }
   }

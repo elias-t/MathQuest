@@ -13,6 +13,7 @@ import {
 import { ProblemsService } from './problems.service';
 import { CreateProblemDto } from './dto/create-problem.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
+import { GetHintDto } from './dto/get-hint.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 
 @UseGuards(JwtAuthGuard)
@@ -46,5 +47,10 @@ export class ProblemsController {
   remove(@Param('id') id: string, @Request() req: any) {
     if (req.user.role !== 'TEACHER') throw new ForbiddenException();
     return this.problemsService.remove(id, req.user.userId);
+  }
+
+  @Post(':id/hint')
+  getHint(@Param('id') id: string, @Body() dto: GetHintDto) {
+    return this.problemsService.getHint(id, dto.previousHints ?? []);
   }
 }
