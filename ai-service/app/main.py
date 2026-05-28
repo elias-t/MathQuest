@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from dotenv import load_dotenv
-from app.routers import validation, hints
+from app.routers import validation, hints, rag
 
 load_dotenv()
 
@@ -8,6 +8,7 @@ app = FastAPI(title="MathQuest AI Service")
 
 app.include_router(validation.router)
 app.include_router(hints.router)
+app.include_router(rag.router)
 
 @app.get("/")
 def root():

@@ -24,10 +24,20 @@ export class ProblemsService {
     return problem;
   }
 
-  create(dto: CreateProblemDto, userId: string) {
-    return this.prisma.problem.create({
+  async create(dto: CreateProblemDto, userId: string) {
+    const problem = await this.prisma.problem.create({
       data: { ...dto, createdById: userId },
     });
+
+    void this.aiService.indexProblem(
+      problem.id,
+      problem.title,
+      problem.description,
+      problem.topic,
+      problem.difficulty,
+    );
+
+    return problem;
   }
 
   async update(id: string, dto: UpdateProblemDto, userId: string) {
@@ -44,10 +54,16 @@ export class ProblemsService {
     return this.prisma.problem.delete({ where: { id } });
   }
 
-  async getHint(problemId: string, previousHints: string[]) {
-    const problem = await this.prisma.problem.findUnique({ where: { id: problemId } });
+  async getHint(problemId: string, previousHints: string[]): Promise<any> {
+    const problem = await this.prisma.problem.findUnique({
+      where: { id: problemId },
+    });
     if (!problem) throw new NotFoundException('Problem not found');
-    const result = await this.aiService.getHint(problem.description, previousHints);
+    const result = await this.aiService.getHint(
+      problem.description,
+      problem.correctAnswer,
+      previousHints,
+    );
     if (!result) throw new ServiceUnavailableException('AI hint service unavailable');
     return result;
   }

@@ -18,7 +18,7 @@ export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly aiUrl = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
-  constructor(private httpService: HttpService) {}
+  constructor(private httpService: HttpService) { }
 
   async validateAnswer(
     problem: string,
@@ -40,14 +40,70 @@ export class AiService {
     }
   }
 
+  async indexProblem(
+    problemId: string,
+    title: string,
+    description: string,
+    topic: string,
+    difficulty: number,
+  ): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.httpService.post(`${this.aiUrl}/rag/index`, {
+          problem_id: problemId,
+          title,
+          description,
+          topic,
+          difficulty,
+        }),
+      );
+    } catch (error) {
+      this.logger.error('RAG indexing failed: ' + JSON.stringify({
+        message: (error as any).message,
+        status: (error as any)?.response?.status,
+        data: (error as any)?.response?.data,
+      }));
+    }
+  }
+
+  async getRecommendation(
+    topicPerformance: { topic: string; correct: number; total: number }[],
+    lastProblemId?: string,
+  ): Promise<Record<string, unknown> | null> {
+    try {
+      this.logger.log('RAG payload: ' + JSON.stringify({
+        student_id: '',
+        topic_performance: topicPerformance,
+        last_problem_id: lastProblemId ?? null,
+      }));
+      const response = await firstValueFrom(
+        this.httpService.post(`${this.aiUrl}/rag/recommend`, {
+          student_id: '',
+          topic_performance: topicPerformance,
+          last_problem_id: lastProblemId ?? null,
+        }),
+      );
+      return response.data;
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        this.logger.log('No recommendation available — not enough candidates');
+        return null;
+      }
+      this.logger.error('RAG recommendation failed', (error as Error).message);
+      return null;
+    }
+  }
+
   async getHint(
     problem: string,
+    correctAnswer: string,
     previousHints: string[],
   ): Promise<HintResult | null> {
     try {
       const response = await firstValueFrom(
         this.httpService.post(`${this.aiUrl}/hint`, {
           problem,
+          correct_answer: correctAnswer,
           previous_hints: previousHints,
         }),
       );

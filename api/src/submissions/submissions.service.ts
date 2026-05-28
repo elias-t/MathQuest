@@ -34,7 +34,7 @@ export class SubmissionsService {
       where: { problemId: dto.problemId, studentId },
     });
 
-    return this.prisma.submission.create({
+    const savedSubmission = await this.prisma.submission.create({
       data: {
         answer: dto.answer,
         timeTaken: dto.timeTaken,
@@ -45,6 +45,31 @@ export class SubmissionsService {
         studentId,
       },
     });
+
+    const allSubmissions = await this.prisma.submission.findMany({
+      where: { studentId },
+      include: { problem: { select: { topic: true } } },
+    });
+
+    const topicMap = new Map<string, { correct: number; total: number }>();
+    for (const s of allSubmissions) {
+      const topic = s.problem.topic;
+      const entry = topicMap.get(topic) ?? { correct: 0, total: 0 };
+      entry.total += 1;
+      if (s.isCorrect) entry.correct += 1;
+      topicMap.set(topic, entry);
+    }
+
+    const topicPerformance = Array.from(topicMap.entries()).map(
+      ([topic, { correct, total }]) => ({ topic, correct, total }),
+    );
+
+    const recommendation = await this.aiService.getRecommendation(
+      topicPerformance,
+      problem.id,
+    );
+
+    return { ...savedSubmission, recommendation: recommendation ?? null };
   }
 
   findMySubmissions(studentId: string) {
