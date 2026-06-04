@@ -4,6 +4,17 @@ import { AiService } from '../ai/ai.service';
 import { CreateProblemDto } from './dto/create-problem.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
 
+interface GenerateNextResult {
+  description: string;
+  machine_form: string;
+  problem_type: string;
+  variable: string;
+  correct_answer: string;
+  difficulty: number;
+  solution_steps: string[];
+  new_skill: string;
+}
+
 @Injectable()
 export class ProblemsService {
   constructor(
@@ -18,7 +29,11 @@ export class ProblemsService {
   async findOne(id: string) {
     const problem = await this.prisma.problem.findUnique({
       where: { id },
-      include: { createdBy: true },
+      include: {
+        createdBy: {
+          select: { id: true, email: true, displayName: true, role: true },
+        },
+      },
     });
     if (!problem) throw new NotFoundException('Problem not found');
     return problem;
@@ -52,6 +67,55 @@ export class ProblemsService {
     if (!problem) throw new NotFoundException('Problem not found');
     if (problem.createdById !== userId) throw new ForbiddenException('Not the owner');
     return this.prisma.problem.delete({ where: { id } });
+  }
+
+  async generateAndPersist(
+    sourceProblemId: string,
+    direction: string,
+  ): Promise<any> {
+    const source = await this.prisma.problem.findUnique({
+      where: { id: sourceProblemId },
+    });
+    if (!source) throw new NotFoundException('Problem not found');
+
+    const result: GenerateNextResult | null = await this.aiService.generateNext(
+      source.description,
+      source.machineForm,
+      source.variable,
+      source.topic,
+      source.difficulty,
+      direction,
+    );
+    if (!result) return null;
+
+    const delta = direction === 'harder' ? 1 : -1;
+    const newDifficulty = Math.min(10, Math.max(1, source.difficulty + delta));
+
+    const newProblem = await this.prisma.problem.create({
+      data: {
+        title: `Practice: ${result.new_skill ?? source.topic}`,
+        description: result.description,
+        topic: source.topic,
+        difficulty: newDifficulty,
+        ageGroup: source.ageGroup,
+        correctAnswer: result.correct_answer,
+        hints: result.solution_steps.join('\n'),
+        createdById: source.createdById,
+        aiGenerated: true,
+        machineForm: result.machine_form,
+        variable: result.variable,
+      },
+    });
+
+    void this.aiService.indexProblem(
+      newProblem.id,
+      newProblem.title,
+      newProblem.description,
+      newProblem.topic,
+      newProblem.difficulty,
+    );
+
+    return newProblem;
   }
 
   async getHint(problemId: string, previousHints: string[]): Promise<any> {

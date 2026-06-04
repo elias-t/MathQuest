@@ -9,11 +9,13 @@ import {
   Request,
   UseGuards,
   ForbiddenException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ProblemsService } from './problems.service';
 import { CreateProblemDto } from './dto/create-problem.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
 import { GetHintDto } from './dto/get-hint.dto';
+import { GenerateNextDto } from './dto/generate-next.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 
 @UseGuards(JwtAuthGuard)
@@ -52,5 +54,12 @@ export class ProblemsController {
   @Post(':id/hint')
   getHint(@Param('id') id: string, @Body() dto: GetHintDto) {
     return this.problemsService.getHint(id, dto.previousHints ?? []);
+  }
+
+  @Post(':id/generate-next')
+  async generateNext(@Param('id') id: string, @Body() dto: GenerateNextDto) {
+    const result = await this.problemsService.generateAndPersist(id, dto.direction ?? 'harder');
+    if (!result) throw new ServiceUnavailableException('AI generation service unavailable');
+    return result;
   }
 }

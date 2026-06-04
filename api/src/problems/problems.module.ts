@@ -9,5 +9,6 @@ import { ProblemsService } from './problems.service';
   imports: [PrismaModule, AuthModule, AiModule],
   controllers: [ProblemsController],
   providers: [ProblemsService],
+  exports: [ProblemsService],
 })
 export class ProblemsModule {}

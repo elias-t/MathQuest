@@ -47,3 +47,21 @@ class RecommendResponse(BaseModel):
     topic: str
     difficulty: int
     reasoning: str
+    
+class GenerateRequest(BaseModel):
+    solved_problem: str
+    solved_machine_form: str = ""
+    variable: str = ""
+    topic: str
+    difficulty: int
+    direction: str = "harder"
+    
+class GenerateResponse(BaseModel):
+    description: str
+    machine_form: str
+    problem_type: str
+    variable: str
+    correct_answer: str
+    difficulty: int
+    solution_steps: list[str]
+    new_skill: str  

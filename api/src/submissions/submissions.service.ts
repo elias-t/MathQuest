@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
+import { ProblemsService } from '../problems/problems.service';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class SubmissionsService {
   constructor(
     private prisma: PrismaService,
     private aiService: AiService,
+    private problemsService: ProblemsService,
   ) {}
 
   async create(dto: CreateSubmissionDto, studentId: string) {
@@ -46,30 +48,18 @@ export class SubmissionsService {
       },
     });
 
-    const allSubmissions = await this.prisma.submission.findMany({
-      where: { studentId },
-      include: { problem: { select: { topic: true } } },
-    });
-
-    const topicMap = new Map<string, { correct: number; total: number }>();
-    for (const s of allSubmissions) {
-      const topic = s.problem.topic;
-      const entry = topicMap.get(topic) ?? { correct: 0, total: 0 };
-      entry.total += 1;
-      if (s.isCorrect) entry.correct += 1;
-      topicMap.set(topic, entry);
+    let direction: string | null = null;
+    if (isCorrect) {
+      direction = 'harder';
+    } else if (savedSubmission.attemptNumber >= 3) {
+      direction = 'scaffold';
     }
 
-    const topicPerformance = Array.from(topicMap.entries()).map(
-      ([topic, { correct, total }]) => ({ topic, correct, total }),
-    );
+    const nextProblem = direction
+      ? await this.problemsService.generateAndPersist(dto.problemId, direction)
+      : null;
 
-    const recommendation = await this.aiService.getRecommendation(
-      topicPerformance,
-      problem.id,
-    );
-
-    return { ...savedSubmission, recommendation: recommendation ?? null };
+    return { ...savedSubmission, nextProblem: nextProblem ?? null };
   }
 
   findMySubmissions(studentId: string) {

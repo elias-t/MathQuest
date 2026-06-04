@@ -13,6 +13,17 @@ interface HintResult {
   hint_level: number;
 }
 
+export interface GenerateNextResult {
+  description: string;
+  machine_form: string;
+  problem_type: string;
+  variable: string;
+  correct_answer: string;
+  difficulty: number;
+  solution_steps: string[];
+  new_skill: string;
+}
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -90,6 +101,32 @@ export class AiService {
         return null;
       }
       this.logger.error('RAG recommendation failed', (error as Error).message);
+      return null;
+    }
+  }
+
+  async generateNext(
+    solvedProblem: string,
+    solvedMachineForm: string | null,
+    variable: string | null,
+    topic: string,
+    difficulty: number,
+    direction: string,
+  ): Promise<GenerateNextResult | null> {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post(`${this.aiUrl}/generate-next`, {
+          solved_problem: solvedProblem,
+          solved_machine_form: solvedMachineForm ?? '',
+          variable: variable ?? '',
+          topic,
+          difficulty,
+          direction,
+        }),
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.error('AI generation failed', (error as Error).message);
       return null;
     }
   }

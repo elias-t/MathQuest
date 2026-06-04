@@ -53,6 +53,9 @@ model Problem {
   ageGroup      String
   correctAnswer String
   hints         String
+  aiGenerated   Boolean  @default(false)
+  machineForm   String?
+  variable      String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

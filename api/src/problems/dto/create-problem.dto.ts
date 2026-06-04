@@ -1,14 +1,26 @@
-import { IsInt, Max, Min } from 'class-validator';
+import { IsInt, IsString, Max, Min } from 'class-validator';
 
 export class CreateProblemDto {
-  title: string;
-  description: string;
-  topic: string;
+  @IsString()
+  title!: string;
+
+  @IsString()
+  description!: string;
+
+  @IsString()
+  topic!: string;
+
   @IsInt()
   @Min(1)
   @Max(10)
-  difficulty: number;
-  ageGroup: string;
-  correctAnswer: string;
-  hints: string;
+  difficulty!: number;
+
+  @IsString()
+  ageGroup!: string;
+
+  @IsString()
+  correctAnswer!: string;
+
+  @IsString()
+  hints!: string;
 }
