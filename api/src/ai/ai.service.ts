@@ -78,18 +78,19 @@ export class AiService {
   }
 
   async getRecommendation(
+    studentId: string,
     topicPerformance: { topic: string; correct: number; total: number }[],
     lastProblemId?: string,
   ): Promise<Record<string, unknown> | null> {
     try {
-      this.logger.log('RAG payload: ' + JSON.stringify({
-        student_id: '',
+      this.logger.debug('RAG payload: ' + JSON.stringify({
+        student_id: studentId,
         topic_performance: topicPerformance,
         last_problem_id: lastProblemId ?? null,
       }));
       const response = await firstValueFrom(
         this.httpService.post(`${this.aiUrl}/rag/recommend`, {
-          student_id: '',
+          student_id: studentId,
           topic_performance: topicPerformance,
           last_problem_id: lastProblemId ?? null,
         }),

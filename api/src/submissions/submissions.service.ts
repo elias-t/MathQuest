@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
-import { ProblemsService } from '../problems/problems.service';
+import { ProblemsService, GenerationDirection } from '../problems/problems.service';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 
 @Injectable()
@@ -35,6 +35,7 @@ export class SubmissionsService {
     const previousAttempts = await this.prisma.submission.count({
       where: { problemId: dto.problemId, studentId },
     });
+    const attemptNumber = previousAttempts + 1;
 
     const savedSubmission = await this.prisma.submission.create({
       data: {
@@ -42,16 +43,16 @@ export class SubmissionsService {
         timeTaken: dto.timeTaken,
         isCorrect,
         aiFeedback,
-        attemptNumber: previousAttempts + 1,
+        attemptNumber,
         problemId: dto.problemId,
         studentId,
       },
     });
 
-    let direction: string | null = null;
+    let direction: GenerationDirection | null = null;
     if (isCorrect) {
       direction = 'harder';
-    } else if (savedSubmission.attemptNumber >= 3) {
+    } else if (attemptNumber >= 3) {
       direction = 'scaffold';
     }
 
