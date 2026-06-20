@@ -8,6 +8,7 @@ import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import ProblemDetail from './pages/ProblemDetail';
 import ProblemForm from './pages/ProblemForm';
+import StudentDetail from './pages/StudentDetail';
 
 function RootRedirect() {
   const { user, loading } = useAuth();
@@ -70,6 +71,14 @@ export default function App() {
                 element={
                   <RequireRole role="TEACHER" redirectTo="/student">
                     <ProblemForm mode="edit" />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/students/:id"
+                element={
+                  <RequireRole role="TEACHER" redirectTo="/student">
+                    <StudentDetail />
                   </RequireRole>
                 }
               />
