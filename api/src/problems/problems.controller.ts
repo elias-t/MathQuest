@@ -61,6 +61,11 @@ export class ProblemsController {
     return result;
   }
 
+  @Get(':id/stats')
+  getStats(@Param('id') id: string) {
+    return this.problemsService.getStats(id);
+  }
+
   @Post(':id/hint')
   getHint(@Param('id') id: string, @Body() dto: GetHintDto) {
     return this.problemsService.getHint(id, dto.previousHints ?? []);

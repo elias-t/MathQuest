@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { CreateProblemDto } from './dto/create-problem.dto';
@@ -66,14 +71,16 @@ export class ProblemsService {
   async update(id: string, dto: UpdateProblemDto, userId: string) {
     const problem = await this.prisma.problem.findUnique({ where: { id } });
     if (!problem) throw new NotFoundException('Problem not found');
-    if (problem.createdById !== userId) throw new ForbiddenException('Not the owner');
+    if (problem.createdById !== userId)
+      throw new ForbiddenException('Not the owner');
     return this.prisma.problem.update({ where: { id }, data: dto });
   }
 
   async remove(id: string, userId: string) {
     const problem = await this.prisma.problem.findUnique({ where: { id } });
     if (!problem) throw new NotFoundException('Problem not found');
-    if (problem.createdById !== userId) throw new ForbiddenException('Not the owner');
+    if (problem.createdById !== userId)
+      throw new ForbiddenException('Not the owner');
     return this.prisma.problem.delete({ where: { id } });
   }
 
@@ -152,7 +159,11 @@ export class ProblemsService {
       total: v.total,
     }));
 
-    const result = await this.aiService.getRecommendation(studentId, topicPerformance, lastProblemId);
+    const result = await this.aiService.getRecommendation(
+      studentId,
+      topicPerformance,
+      lastProblemId,
+    );
     return result;
   }
 
@@ -166,7 +177,68 @@ export class ProblemsService {
       problem.correctAnswer,
       previousHints,
     );
-    if (!result) throw new ServiceUnavailableException('AI hint service unavailable');
+    if (!result)
+      throw new ServiceUnavailableException('AI hint service unavailable');
     return result;
+  }
+
+  async getStats(problemId: string) {
+    const problem = await this.prisma.problem.findUnique({
+      where: { id: problemId },
+    });
+    if (!problem) throw new NotFoundException('Problem not found');
+
+    const submissions = await this.prisma.submission.findMany({
+      where: { problemId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const totalSubmissions = submissions.length;
+
+    const studentIds = new Set(submissions.map((s) => s.studentId));
+    const studentsAttempted = studentIds.size;
+
+    const studentsCorrect = new Set(
+      submissions.filter((s) => s.isCorrect).map((s) => s.studentId),
+    ).size;
+
+    const successRate =
+      studentsAttempted === 0
+        ? 0
+        : Math.round((studentsCorrect / studentsAttempted) * 100);
+
+    const attemptsByStudent: number[] = [];
+    for (const sid of studentIds) {
+      const studentSubs = submissions.filter((s) => s.studentId === sid);
+      const firstCorrect = studentSubs.find((s) => s.isCorrect);
+      if (firstCorrect) {
+        attemptsByStudent.push(firstCorrect.attemptNumber);
+      }
+    }
+    const avgAttemptsToSolve =
+      attemptsByStudent.length === 0
+        ? 0
+        : Math.round(
+            (attemptsByStudent.reduce((a, b) => a + b, 0) /
+              attemptsByStudent.length) *
+              10,
+          ) / 10;
+
+    const avgTimeTaken =
+      totalSubmissions === 0
+        ? 0
+        : Math.round(
+            submissions.reduce((acc, s) => acc + s.timeTaken, 0) /
+              totalSubmissions,
+          );
+
+    return {
+      totalSubmissions,
+      studentsAttempted,
+      studentsCorrect,
+      successRate,
+      avgAttemptsToSolve,
+      avgTimeTaken,
+    };
   }
 }

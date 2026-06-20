@@ -35,12 +35,10 @@ export class AuthService {
       },
     });
 
-    // Return JWT token
-    return this.signToken(user.id, user.email, user.role);
+    return this.signToken(user.id, user.email, user.role, user.displayName);
   }
 
   async login(dto: LoginDto) {
-    // Find user by email
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -49,21 +47,19 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Check password
     const passwordMatch = await bcrypt.compare(dto.password, user.password);
 
     if (!passwordMatch) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Return JWT token
-    return this.signToken(user.id, user.email, user.role);
+    return this.signToken(user.id, user.email, user.role, user.displayName);
   }
 
-  private signToken(userId: string, email: string, role: string) {
-    const payload = { sub: userId, email, role };
+  private signToken(userId: string, email: string, role: string, displayName: string) {
+    const payload = { sub: userId, email, role, displayName };
     return {
-      token: this.jwtService.sign(payload),
+      access_token: this.jwtService.sign(payload),
     };
   }
 }
