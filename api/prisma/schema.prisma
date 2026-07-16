@@ -41,6 +41,8 @@ model User {
 
   // Student submits answers
   submissions Submission[]
+
+  generatedProblems Problem[] @relation("GeneratedProblems")
 }
 
 model Problem {
@@ -61,7 +63,9 @@ model Problem {
 
   //Relations
   createdBy     User     @relation("TeacherProblems", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  createdById   String  
+  createdById   String
+  generatedFor    User?    @relation("GeneratedProblems", fields: [generatedForId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  generatedForId  String?
   submissions   Submission[]
 }
 
