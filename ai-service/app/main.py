@@ -1,0 +1,20 @@
+from fastapi import FastAPI
+from dotenv import load_dotenv
+from app.routers import validation, hints, rag, generation
+
+load_dotenv()
+
+app = FastAPI(title="MathQuest AI Service")
+
+app.include_router(validation.router)
+app.include_router(hints.router)
+app.include_router(rag.router)
+app.include_router(generation.router)
+
+@app.get("/")
+def root():
+    return {"message": "MathQuest AI Service is running"}
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
