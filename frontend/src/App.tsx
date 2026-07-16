@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AppHeader from './components/layout/AppHeader';
@@ -9,6 +9,12 @@ import StudentDashboard from './pages/StudentDashboard';
 import ProblemDetail from './pages/ProblemDetail';
 import ProblemForm from './pages/ProblemForm';
 import StudentDetail from './pages/StudentDetail';
+import StudentSolveProblem from './pages/StudentSolveProblem';
+
+function StudentSolveProblemRoute() {
+  const { id } = useParams();
+  return <StudentSolveProblem key={id} />;
+}
 
 function RootRedirect() {
   const { user, loading } = useAuth();
@@ -79,6 +85,14 @@ export default function App() {
                 element={
                   <RequireRole role="TEACHER" redirectTo="/student">
                     <StudentDetail />
+                  </RequireRole>
+                }
+              />
+              <Route
+                path="/student/problems/:id"
+                element={
+                  <RequireRole role="STUDENT" redirectTo="/dashboard">
+                    <StudentSolveProblemRoute />
                   </RequireRole>
                 }
               />
