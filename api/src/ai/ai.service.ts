@@ -146,8 +146,8 @@ export class AiService {
         }),
       );
       return response.data;
-    } catch (error) {
-      this.logger.error('AI hint failed', (error as Error).message);
+    } catch (err) {
+      this.logger.error('AI hint failed', err instanceof Error ? err.stack : err);
       return null;
     }
   }
