@@ -39,6 +39,49 @@ export class ProblemsService {
     });
   }
 
+  async findAllForStudent(studentId: string) {
+    const problems = await this.prisma.problem.findMany({
+      where: {
+        OR: [{ aiGenerated: false }, { generatedForId: studentId }],
+      },
+      include: {
+        submissions: { where: { studentId } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return problems.map((p) => {
+      const subs = p.submissions;
+      let status:
+        | 'NOT_ATTEMPTED'
+        | 'ATTEMPTED'
+        | 'SOLVED_FIRST_TRY'
+        | 'SOLVED_LATER';
+      if (subs.length === 0) {
+        status = 'NOT_ATTEMPTED';
+      } else {
+        const correct = subs.filter((s) => s.isCorrect);
+        if (correct.length === 0) {
+          status = 'ATTEMPTED';
+        } else {
+          const firstCorrectAttempt = Math.min(
+            ...correct.map((s) => s.attemptNumber),
+          );
+          status =
+            firstCorrectAttempt === 1 ? 'SOLVED_FIRST_TRY' : 'SOLVED_LATER';
+        }
+      }
+      return {
+        id: p.id,
+        title: p.title,
+        topic: p.topic,
+        difficulty: p.difficulty,
+        aiGenerated: p.aiGenerated,
+        status,
+      };
+    });
+  }
+
   async findOne(id: string) {
     const problem = await this.prisma.problem.findUnique({
       where: { id },
@@ -87,6 +130,7 @@ export class ProblemsService {
   async generateAndPersist(
     sourceProblemId: string,
     direction: GenerationDirection,
+    studentId: string,
   ): Promise<any> {
     const source = await this.prisma.problem.findUnique({
       where: { id: sourceProblemId },
@@ -122,6 +166,7 @@ export class ProblemsService {
         correctAnswer: result.correct_answer,
         hints: result.solution_steps.join('\n'),
         createdById: source.createdById,
+        generatedForId: studentId,
         aiGenerated: true,
         machineForm: result.machine_form,
         variable: result.variable,

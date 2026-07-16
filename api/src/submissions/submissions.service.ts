@@ -37,6 +37,10 @@ export class SubmissionsService {
     });
     const attemptNumber = previousAttempts + 1;
 
+    const priorCorrect = await this.prisma.submission.count({
+      where: { problemId: dto.problemId, studentId, isCorrect: true },
+    });
+
     const savedSubmission = await this.prisma.submission.create({
       data: {
         answer: dto.answer,
@@ -50,14 +54,20 @@ export class SubmissionsService {
     });
 
     let direction: GenerationDirection | null = null;
-    if (isCorrect) {
+    if (isCorrect && priorCorrect === 0) {
+      // advance to a harder problem only the FIRST time they solve this one
       direction = 'harder';
-    } else if (attemptNumber >= 3) {
+    } else if (!isCorrect && attemptNumber === 3) {
+      // generate a scaffold exactly once, on the 3rd failed attempt
       direction = 'scaffold';
     }
 
     const nextProblem = direction
-      ? await this.problemsService.generateAndPersist(dto.problemId, direction)
+      ? await this.problemsService.generateAndPersist(
+          dto.problemId,
+          direction,
+          studentId,
+        )
       : null;
 
     return { ...savedSubmission, nextProblem: nextProblem ?? null };

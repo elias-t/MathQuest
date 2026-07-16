@@ -36,6 +36,12 @@ export class ProblemsController {
     return this.problemsService.findAll();
   }
 
+  @Get('student')
+  findForStudent(@Request() req: AuthRequest) {
+    if (req.user.role !== 'STUDENT') throw new ForbiddenException('Students only');
+    return this.problemsService.findAllForStudent(req.user.userId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.problemsService.findOne(id);
@@ -72,8 +78,16 @@ export class ProblemsController {
   }
 
   @Post(':id/generate-next')
-  async generateNext(@Param('id') id: string, @Body() dto: GenerateNextDto) {
-    const result = await this.problemsService.generateAndPersist(id, dto.direction ?? 'harder');
+  async generateNext(
+    @Param('id') id: string,
+    @Body() dto: GenerateNextDto,
+    @Request() req: AuthRequest,
+  ) {
+    const result = await this.problemsService.generateAndPersist(
+      id,
+      dto.direction ?? 'harder',
+      req.user.userId,
+    );
     if (!result) throw new ServiceUnavailableException('AI generation service unavailable');
     return result;
   }
