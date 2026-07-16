@@ -5,6 +5,8 @@ from sympy import sympify, Eq, solve, Symbol
 
 load_dotenv()
 
+GENERATOR_MODEL = os.getenv("GENERATOR_MODEL", "claude-sonnet-4-6")
+
 GENERATE_TOOL = {
     "name": "generate_problem",
     "description": "Generate a new maths problem for a student",
@@ -159,7 +161,7 @@ Use the generate_problem tool to return the problem."""
 
     client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=GENERATOR_MODEL,
         max_tokens=600,
         tools=[GENERATE_TOOL],
         tool_choice={"type": "tool", "name": "generate_problem"},

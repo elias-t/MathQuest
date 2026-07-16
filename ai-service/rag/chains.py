@@ -6,6 +6,8 @@ from rag.prompts import build_recommendation_prompt
 
 load_dotenv()
 
+RECOMMEND_MODEL = os.getenv("RECOMMEND_MODEL", "claude-sonnet-4-6")
+
 RECOMMEND_TOOL = {
     "name": "recommend_problem",
     "description": "Recommend the best next problem for the student",
@@ -49,7 +51,7 @@ def recommend_next_problem(
 
     client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=RECOMMEND_MODEL,
         max_tokens=400,
         tools=[RECOMMEND_TOOL],
         tool_choice={"type": "tool", "name": "recommend_problem"},

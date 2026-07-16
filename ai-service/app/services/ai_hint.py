@@ -5,6 +5,8 @@ from app.models.schemas import HintRequest, HintResponse
 
 load_dotenv()
 
+HINT_MODEL = os.getenv("HINT_MODEL", "claude-haiku-4-5")
+
 HINT_TOOL = {
     "name": "submit_hint",
     "description": "Submit a helpful hint for a maths problem",
@@ -47,7 +49,7 @@ one slightly more direct than the last.
 Use the submit_hint tool."""
 
     message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model=HINT_MODEL,
         max_tokens=200,
         tools=[HINT_TOOL],
         tool_choice={"type": "tool", "name": "submit_hint"},
