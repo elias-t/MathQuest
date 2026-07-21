@@ -17,6 +17,28 @@ The pedagogical model is an **adaptive loop**: on each submission, NestJS decide
 
 ---
 
+## Running the Services
+
+Run each in its own terminal (PowerShell). Start order: **ai-service → api → frontend** (the API tolerates the AI service being down, but the frontend fetches from the API on load).
+
+**ai-service** — Python FastAPI, port 8000. From `ai-service/`:
+```powershell
+venv\Scripts\Activate.ps1
+uvicorn app.main:app --reload --port 8000
+```
+
+**api** — NestJS, port 3000. From `api/`:
+```powershell
+npm run start:dev
+```
+
+**frontend** — React + Vite, port 5173. From `frontend/`:
+```powershell
+npm run dev
+```
+
+---
+
 ## api/ — NestJS Backend
 
 **Stack:** NestJS, Prisma, PostgreSQL, Passport JWT
@@ -46,7 +68,8 @@ The pedagogical model is an **adaptive loop**: on each submission, NestJS decide
 | POST | `/auth/register` | Public | Register user |
 | POST | `/auth/login` | Public | Login, returns JWT |
 | GET | `/auth/me` | JWT | Get current user |
-| GET | `/problems` | JWT | List all problems |
+| GET | `/problems` | JWT | List all problems (teacher view) |
+| GET | `/problems/student` | STUDENT | Problems visible to the caller (teacher problems + own AI problems) with per-student `status`. **Must be declared before `/problems/:id`** or the router captures it as `id="student"`. |
 | GET | `/problems/:id` | JWT | Get single problem |
 | POST | `/problems` | TEACHER | Create problem (include `machineForm` + `variable` for equations) |
 | PATCH | `/problems/:id` | TEACHER + owner | Update problem |
@@ -73,29 +96,33 @@ URL configured via `AI_SERVICE_URL` env var (default: `http://localhost:8000`).
 **ProblemsService key methods:**
 
 - `create(...)` — saves problem, fires `indexProblem()` (fire-and-forget)
-- `generateAndPersist(sourceProblemId, direction)` — calls AI generation, persists result as a new Problem row with `aiGenerated=true`, inherits `createdById` from source, and indexes the new problem into ChromaDB
+- `generateAndPersist(sourceProblemId, direction, studentId)` — calls AI generation, persists result as a new Problem row with `aiGenerated=true`, inherits `createdById` from source, **stamps `generatedForId=studentId`** (the owning student), and indexes the new problem into ChromaDB
+- `findAllForStudent(studentId)` — returns problems visible to one student (`aiGenerated=false` OR `generatedForId=studentId`), each with a computed per-student `status` derived from that student's own submissions: `NOT_ATTEMPTED` | `ATTEMPTED` | `SOLVED_FIRST_TRY` | `SOLVED_LATER`
 
 **SubmissionsService.create() flow:**
 
 ```
 1. Find source problem
 2. AI-validate answer (fallback to string comparison if AI down)
-3. Save submission with attemptNumber
-4. Decide direction:
-     isCorrect = true                     → "harder"
-     isCorrect = false, attempts < 3      → no direction (no nextProblem)
-     isCorrect = false, attempts ≥ 3      → "scaffold"
-5. If direction set: nextProblem = await problemsService.generateAndPersist(...)
-6. Return { ...submission, nextProblem | null }
+3. Count previousAttempts AND priorCorrect (both BEFORE creating this submission)
+4. Save submission with attemptNumber (= previousAttempts + 1)
+5. Decide direction (GENERATION is gated, submissions are always kept):
+     isCorrect && priorCorrect === 0      → "harder"   (only the FIRST solve)
+     !isCorrect && attemptNumber === 3    → "scaffold"  (exactly once, on 3rd miss)
+     otherwise                            → no direction (no nextProblem)
+6. If direction set: nextProblem = await problemsService.generateAndPersist(problemId, direction, studentId)
+7. Return { ...submission, nextProblem | null }
 ```
+
+⚠️ The gate is on **generation, not submission** — re-submitting a correct answer still records the attempt but does NOT spawn a duplicate AI problem. `priorCorrect === 0` prevents duplicate "harder" problems; `attemptNumber === 3` (strict) prevents runaway scaffolds on the 4th, 5th… miss.
 
 **Prisma schema key models:**
 
-- `User`: id, email, password (bcrypt-hashed — **must be excluded from API responses**), displayName, role (String), teacherId (self-relation)
-- `Problem`: id, title, description, topic, difficulty (Int 1-10), ageGroup, correctAnswer, hints, createdById, **aiGenerated (Boolean, default false)**, **machineForm (String?)**, **variable (String?)**
+- `User`: id, email, password (bcrypt-hashed — **must be excluded from API responses**), displayName, role (String), teacherId (self-relation), **generatedProblems (Problem[] via `@relation("GeneratedProblems")`)**
+- `Problem`: id, title, description, topic, difficulty (Int 1-10), ageGroup, correctAnswer, hints, createdById, **aiGenerated (Boolean, default false)**, **machineForm (String?)**, **variable (String?)**, **generatedForId (String?)** — the owning student for AI-generated problems (NULL for teacher-authored problems and pre-migration rows); relation `generatedFor` via `@relation("GeneratedProblems")`, named distinctly from the `TeacherProblems` relation
 - `Submission`: id, answer, isCorrect, timeTaken, aiFeedback, hintsUsed, attemptNumber, studentId, problemId
 
-⚠️ **Known TODO:** `password` is currently leaking via `createdBy` includes — fix by using Prisma `select` to omit it everywhere a User is returned.
+✅ **`password` can never be returned.** A **global Prisma omit** (`omit: { user: { password: true } }` in `prisma.service.ts`, via the `omitApi` preview feature) strips it from every User query result — including nested includes — at the client level, and removes it from the result *types* (reading `.password` is a compile error). The single opt-back-in is the login bcrypt compare in `auth.service.ts` (`omit: { password: false }`). Existing per-query `select`s still apply on top.
 
 ---
 
@@ -113,11 +140,14 @@ ai-service/
 ├── app/
 │   ├── main.py              ← FastAPI app, routers registered here
 │   ├── models/schemas.py    ← Pydantic request/response models
-│   └── routers/
-│       ├── validation.py    ← POST /validate
-│       ├── hints.py         ← POST /hint
-│       ├── rag.py           ← POST /rag/index, POST /rag/recommend   (parked)
-│       └── generation.py    ← POST /generate-next                    (active)
+│   ├── routers/
+│   │   ├── validation.py    ← POST /validate
+│   │   ├── hints.py         ← POST /hint
+│   │   ├── rag.py           ← POST /rag/index, POST /rag/recommend   (parked)
+│   │   └── generation.py    ← POST /generate-next                    (active)
+│   └── services/
+│       ├── ai_validator.py  ← validate_answer() — Claude call (VALIDATOR_MODEL)
+│       └── ai_hint.py        ← generate_hint()   — Claude call (HINT_MODEL)
 ├── rag/                     ← parked — code intact, not invoked from submissions
 │   ├── ingest.py            ← index_problem()
 │   ├── retrieval.py         ← query_problems()
@@ -138,7 +168,7 @@ ai-service/
 | POST | `/rag/recommend` | parked | Returns recommended next problem (legacy — not used by submissions) |
 | POST | `/generate-next` | active | Generates a calibrated next problem (harder/easier/scaffold) |
 
-**All Claude calls use tool use** (`tool_choice: {"type": "tool", "name": "..."}`) for structured output. Model: `claude-sonnet-4-20250514`.
+**All Claude calls use tool use** (`tool_choice: {"type": "tool", "name": "..."}`) for structured output. Each call site reads its model from a **per-purpose env var** (see Environment Variables): `HINT_MODEL` (default `claude-haiku-4-5`), `VALIDATOR_MODEL`, `GENERATOR_MODEL`, `RECOMMEND_MODEL` (default `claude-sonnet-4-6`). The retired `claude-sonnet-4-20250514` has been removed from the codebase.
 
 ### Generation flow (`/generate-next`)
 
@@ -207,7 +237,12 @@ AI_SERVICE_URL=http://localhost:8000
 **ai-service/.env**
 ```
 ANTHROPIC_API_KEY=...
+HINT_MODEL=claude-haiku-4-5
+VALIDATOR_MODEL=claude-sonnet-4-6
+GENERATOR_MODEL=claude-sonnet-4-6
+RECOMMEND_MODEL=claude-sonnet-4-6
 ```
+Model vars are optional — each call site falls back to the defaults above if unset. `chroma_data/` is gitignored (runtime state, regenerated on startup).
 
 ---
 
@@ -240,12 +275,13 @@ ANTHROPIC_API_KEY=...
 - AI service failures are silent — NestJS falls back gracefully (`null` checks, string comparison for submissions, 503 for hints, null `nextProblem` for generation)
 - ChromaDB uses `upsert` not `add` — safe to re-index problems
 - Python imports run from `ai-service/` as working directory (`from chroma_client import ...`, `from rag.chains import ...`, `from generation.generator import ...`)
-- **All Claude calls use tool use** (`tool_choice: {"type": "tool", "name": "..."}`) for structured output. Same model string everywhere.
+- **All Claude calls use tool use** (`tool_choice: {"type": "tool", "name": "..."}`) for structured output. Each call site reads its model from a per-purpose env var (`HINT_MODEL`, `VALIDATOR_MODEL`, `GENERATOR_MODEL`, `RECOMMEND_MODEL`) — no longer a single shared string.
 - **AI prompts requiring precise behaviour** (especially `generation/generator.py` direction guidance) MUST include explicit `VALID:` / `INVALID:` examples. Without them, Claude defaults to surface-level interpretation (numerical scaling instead of pedagogical scaling).
+- **The validator must NOT reveal the answer on a wrong submission** — `ai_validator.py`'s prompt and the `feedback` tool-field description both forbid stating the correct answer or solution steps when the student is incorrect; feedback is a nudge toward the approach only. (Correct answers may reference the value.)
 - **Generated problems are persisted** with `aiGenerated=true`, inherit `createdById` from their source, and are indexed into ChromaDB on save.
 - **Difficulty stepping is deterministic in NestJS** (`±1`, clamped 1-10) — never trust the model's difficulty field.
 - **Sympy verification** runs in `generation/verify.py`. `verify()` checks the generated problem is internally consistent; `solution_preserved()` (scaffold only) checks the generated equation solves to the same value as the original.
-- **`password` must be excluded** from User-shaped responses — use Prisma `select`. (TODO: currently leaking via `createdBy` includes.)
+- **`password` is excluded globally** via Prisma's `omit` in `prisma.service.ts` — new User-returning queries are safe by default, no `select` required for this. Only login opts back in (`omit: { password: false }`). Don't remove the `omitApi` preview flag from `schema.prisma` — the guard depends on it until Prisma is upgraded to 6+ (where it's GA).
 
 ---
 
