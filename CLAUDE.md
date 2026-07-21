@@ -293,6 +293,45 @@ RAG (ChromaDB + semantic recommendation) was implemented end-to-end and remains 
 
 **Where RAG will return:** a future natural-language feature ("I'm confused about X" search across the problem bank) — the one use case where embeddings genuinely beat a `WHERE` clause, because the input is freeform language with no structured columns to filter by.
 
+**Design sketch for that feature (not built — no code below exists yet):**
+
+The pipeline splits into two independent stages. Only the second one involves Claude — the first is a plain vector search with no LLM call:
+
+1. **Retrieval — no prompt, no Claude.** Reuse `chroma_client.problems_collection` (already indexed on every problem create). Add a new function alongside `rag/retrieval.py::query_problems()` that embeds the student's freeform sentence directly instead of a topic keyword, and drops the topic `where` filter so it searches the whole bank by embedding distance:
+   ```python
+   def query_by_text(student_query: str, n_results: int = 5) -> list[dict]:
+       count = problems_collection.count()
+       if count == 0:
+           return []
+       results = problems_collection.query(
+           query_texts=[student_query],   # freeform text, not a topic keyword
+           n_results=min(n_results, count),
+           # no `where` — search across all topics, ranked by similarity alone
+       )
+       # ...same candidate-building loop as query_problems()
+   ```
+   `query_problems()` itself stays untouched — this is a new function, since the topic-scoped version is still what the parked recommend flow uses if that ever comes back.
+
+2. **Claude pass over the candidates — one specific prompt, forced tool use.** Same shape as `RECOMMEND_TOOL` / `build_recommendation_prompt()` in `rag/chains.py`: hand Claude the retrieved candidates and ask it to pick the one that matches the *concept* the student is stuck on, not just shared keywords. Needs the same `VALID:`/`INVALID:` example treatment as `generation/generator.py` — without it, Claude will default to surface keyword matching (e.g. picking anything with "fraction" in the title) instead of matching the actual sticking point.
+   ```python
+   CONFUSION_MATCH_TOOL = {
+       "name": "submit_match",
+       "description": "Select which candidate problem best addresses what the student is confused about",
+       "input_schema": {
+           "type": "object",
+           "properties": {
+               "problem_id": {"type": "string", "description": "ID of the best-matching problem"},
+               "reasoning": {"type": "string", "description": "Plain-language explanation, for the student, of why this problem addresses their confusion"},
+               "confidence": {"type": "string", "enum": ["high", "medium", "low"]}
+           },
+           "required": ["problem_id", "reasoning", "confidence"]
+       }
+   }
+   ```
+   Prompt template: present the student's raw query + the candidate list (id, title, topic, difficulty, description), instruct Claude to match on concept over vocabulary, give one `VALID:` example (query mentions "moving x's to one side" → matches a variables-on-both-sides problem even without shared wording) and one `INVALID:` example (query says "fractions" → wrongly picks a problem just because the word appears, when the real sticking point — e.g. unlike denominators — isn't what that problem tests).
+
+**Remaining scope to actually ship it:** the two pieces above, plus a new FastAPI router endpoint exposing it, a NestJS controller/service method forwarding to it, and a frontend search box on the student dashboard. Nothing else in the existing RAG/generation code needs to change.
+
 ---
 
 ## Parked for Phase 3
