@@ -41,6 +41,9 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
+      // Global omit strips password everywhere; login is the one place
+      // that must read the hash to bcrypt-compare.
+      omit: { password: false },
     });
 
     if (!user) {
