@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AppHeader from './components/layout/AppHeader';
 import RequireRole from './components/routing/RequireRole';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import ProblemDetail from './pages/ProblemDetail';
@@ -40,6 +41,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<RootRedirect />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
               <Route
                 path="/dashboard"
                 element={
