@@ -41,7 +41,7 @@ npm run dev
 
 ## api/ — NestJS Backend
 
-**Stack:** NestJS, Prisma, PostgreSQL, Passport JWT
+**Stack:** NestJS, Prisma, Azure SQL Database (SQL Server), Passport JWT
 
 **Entry point:** `api/src/main.ts` — listens on port 3000
 
@@ -123,6 +123,12 @@ URL configured via `AI_SERVICE_URL` env var (default: `http://localhost:8000`).
 - `Submission`: id, answer, isCorrect, timeTaken, aiFeedback, hintsUsed, attemptNumber, studentId, problemId
 
 ✅ **`password` can never be returned.** A **global Prisma omit** (`omit: { user: { password: true } }` in `prisma.service.ts`, via the `omitApi` preview feature) strips it from every User query result — including nested includes — at the client level, and removes it from the result *types* (reading `.password` is a compile error). The single opt-back-in is the login bcrypt compare in `auth.service.ts` (`omit: { password: false }`). Existing per-query `select`s still apply on top.
+
+**⚠️ Database is Azure SQL (SQL Server), not Postgres.** The datasource `provider` is `sqlserver`. Consequences baked into the schema/workflow:
+- **No Prisma enums** — SQL Server doesn't support them; `role` and `topic` are plain `String` (the old `enum Role`/`enum Topic` blocks were removed).
+- **Long text fields need `@db.NVarChar(Max)`** — SQL Server's default `String` maps to `nvarchar(1000)`, too small for AI-generated content. `Problem.description`, `Problem.hints`, and `Submission.aiFeedback` carry the annotation; add it to any new free-text/AI-output field.
+- **Schema changes use `npx prisma db push`, not `migrate dev`.** Azure SQL disables automatic shadow-database creation, so `migrate dev` fails (P3020) unless you pay for a second DB as a shadow. `db push` syncs the schema directly with no migration files — there is no `prisma/migrations/` folder. Tradeoff: no incremental migration history / granular rollback.
+- **Connection string** is the SQL Server format: `sqlserver://<server>.database.windows.net:1433;database=MathQuestDb;user=<admin>;password=<pw>;encrypt=true` (TLS `encrypt=true` is required by Azure SQL; wrap the password in `{}` only if it contains `;{}=`).
 
 ---
 
@@ -229,10 +235,11 @@ Remove-Item -Recurse -Force ai-service\chroma_data
 
 **api/.env**
 ```
-DATABASE_URL=postgresql://...
+DATABASE_URL=sqlserver://<server>.database.windows.net:1433;database=MathQuestDb;user=<admin>;password=<pw>;encrypt=true
 JWT_SECRET=...
 AI_SERVICE_URL=http://localhost:8000
 ```
+Local dev points `DATABASE_URL` at the **live Azure SQL instance** (there is no local database — SQL Server LocalDB is named-pipes only, which Prisma's SQL Server driver can't use). This means a firewall rule on the Azure SQL server must allow your current public IP; if local dev suddenly can't connect after a network change, update that rule with the new IP before assuming anything else is broken.
 
 **ai-service/.env**
 ```
