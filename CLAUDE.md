@@ -134,7 +134,7 @@ URL configured via `AI_SERVICE_URL` env var (default: `http://localhost:8000`).
 
 ## ai-service/ — Python FastAPI
 
-**Stack:** FastAPI, Anthropic SDK, ChromaDB, sympy, uvicorn
+**Stack:** FastAPI, Anthropic SDK, sympy, uvicorn (ChromaDB removed for Azure — see "RAG: Parked, ChromaDB Removed from Deployment")
 
 **Entry point:** `ai-service/app/main.py` — listens on port 8000
 
@@ -170,8 +170,8 @@ ai-service/
 |--------|------|--------|-------------|
 | POST | `/validate` | active | Validates student answer using Claude tool use |
 | POST | `/hint` | active | Generates progressive hint using Claude tool use |
-| POST | `/rag/index` | active | Indexes a problem into ChromaDB |
-| POST | `/rag/recommend` | parked | Returns recommended next problem (legacy — not used by submissions) |
+| POST | `/rag/index` | **disabled** | Router not registered (ChromaDB removed) — returns 404 |
+| POST | `/rag/recommend` | **disabled** | Router not registered (ChromaDB removed) — returns 404 |
 | POST | `/generate-next` | active | Generates a calibrated next problem (harder/easier/scaffold) |
 
 **All Claude calls use tool use** (`tool_choice: {"type": "tool", "name": "..."}`) for structured output. Each call site reads its model from a **per-purpose env var** (see Environment Variables): `HINT_MODEL` (default `claude-haiku-4-5`), `VALIDATOR_MODEL`, `GENERATOR_MODEL`, `RECOMMEND_MODEL` (default `claude-sonnet-4-6`). The retired `claude-sonnet-4-20250514` has been removed from the codebase.
@@ -292,9 +292,11 @@ Model vars are optional — each call site falls back to the defaults above if u
 
 ---
 
-## RAG: Parked, Not Removed
+## RAG: Parked, ChromaDB Removed from Deployment
 
-RAG (ChromaDB + semantic recommendation) was implemented end-to-end and remains functional, but is **no longer wired into the submission flow** — generation replaced it. Code, endpoints, and indexing remain intact.
+> **⚠️ Update:** ChromaDB has been **removed from the deployed AI service** and the `rag` router is **no longer registered** in `app/main.py`. ChromaDB doesn't fit Azure App Service's Free tier — it bundles a heavy ML stack for in-process embeddings, needs a newer system `sqlite3` than the container ships, and its build/cold-start burns through F1's daily CPU quota. `chromadb` and its `chroma_client` are gone from `requirements.txt` and startup. The `rag/` package and `app/routers/rag.py` files **remain in the repo for reference** but are dead code until reimplemented. **RAG will return on Azure AI Search** (managed vector store + API-based embeddings, e.g. Azure OpenAI) — the Azure-native design that keeps the App Service lightweight. The `/rag/index` and `/rag/recommend` endpoints therefore return 404 in the deployed service; the NestJS `indexProblem` call is fire-and-forget and fails gracefully (a follow-up should remove it).
+
+RAG (ChromaDB + semantic recommendation) was implemented end-to-end, but is **no longer wired into the submission flow** — generation replaced it — and now **not deployed at all** (per the note above). The design sketch below still applies, but substitute Azure AI Search for ChromaDB as the vector store.
 
 **Why parked:** for the recommend-next-problem use case, RAG's semantic search was constrained by topic filters to the point where a plain SQL query did the same job more transparently. Generation produces calibrated problems on demand, which is a genuinely AI-shaped task that retrieval can't do.
 
