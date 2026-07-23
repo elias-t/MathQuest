@@ -1,5 +1,9 @@
 anthropic==0.104.0
 chromadb
+# Linux only: Azure App Service's system sqlite3 is < 3.35.0, which ChromaDB
+# rejects. This bundles a newer sqlite3 that main.py swaps in at startup.
+# Not installed on Windows (local dev uses the stdlib sqlite3, already new enough).
+pysqlite3-binary; sys_platform == "linux"
 fastapi==0.136.1
 mpmath==1.3.0
 pydantic==2.13.4
