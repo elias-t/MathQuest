@@ -1,24 +1,11 @@
 datasource db {
-  provider = "postgresql"
+  provider = "sqlserver"
   url      = env("DATABASE_URL")
 }
 
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["omitApi"]
-}
-
-enum Role {
-  TEACHER
-  STUDENT
-}
-
-enum Topic {
-  ARITHMETIC
-  ALGEBRA
-  GEOMETRY
-  FRACTIONS
-  STATISTICS
 }
 
 //the student
@@ -49,13 +36,13 @@ model User {
 model Problem {
   id            String   @id @default(cuid())
   title         String
-  description   String
+  description   String   @db.NVarChar(Max)
   // topic: "ARITHMETIC" | "ALGEBRA" | "GEOMETRY" | "FRACTIONS" | "STATISTICS"
   topic       String
   difficulty    Int
   ageGroup      String
   correctAnswer String
-  hints         String
+  hints         String   @db.NVarChar(Max)
   aiGenerated   Boolean  @default(false)
   machineForm   String?
   variable      String?
@@ -75,7 +62,7 @@ model Submission {
   answer        String
   isCorrect     Boolean
   timeTaken     Int
-  aiFeedback    String?
+  aiFeedback    String?  @db.NVarChar(Max)
   hintsUsed     Int       @default(0)
   attemptNumber Int       @default(1)
   createdAt     DateTime @default(now())
