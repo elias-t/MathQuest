@@ -109,12 +109,13 @@ URL configured via `AI_SERVICE_URL` env var (default: `http://localhost:8000`).
 5. Decide direction (GENERATION is gated, submissions are always kept):
      isCorrect && priorCorrect === 0      → "harder"   (only the FIRST solve)
      !isCorrect && attemptNumber === 3    → "scaffold"  (exactly once, on 3rd miss)
-     otherwise                            → no direction (no nextProblem)
-6. If direction set: nextProblem = await problemsService.generateAndPersist(problemId, direction, studentId)
-7. Return { ...submission, nextProblem | null }
+     otherwise                            → null (no next problem offered)
+6. Return { ...submission, nextDirection }   ← does NOT generate here
 ```
 
-⚠️ The gate is on **generation, not submission** — re-submitting a correct answer still records the attempt but does NOT spawn a duplicate AI problem. `priorCorrect === 0` prevents duplicate "harder" problems; `attemptNumber === 3` (strict) prevents runaway scaffolds on the 4th, 5th… miss.
+⚠️ **Generation is DECOUPLED from submission (perf).** The submit response returns only `nextDirection` (fast — just the ~2.5s validation call). The next problem is generated **on demand** when the student clicks "Next problem": the frontend calls `POST /problems/:id/generate-next` with `{ direction: nextDirection }`, which runs `generateAndPersist` (the slow ~4.5s Claude+sympy step) and returns the new problem to navigate to. This keeps generation off the submit path — Submit used to block on validation *and* generation (~7-8s); now it's ~2.5s and the generation wait moves to the Next click where a spinner is expected.
+
+⚠️ The gate is on **generation, not submission** — re-submitting a correct answer still records the attempt but returns `nextDirection: null`, so no duplicate AI problem is offered. `priorCorrect === 0` prevents duplicate "harder" problems; `attemptNumber === 3` (strict) prevents runaway scaffolds on the 4th, 5th… miss. (The `generate-next` endpoint itself is ungated, so the frontend must generate once per Next click — it navigates away on success, and the button is disabled while generating.)
 
 **Prisma schema key models:**
 
