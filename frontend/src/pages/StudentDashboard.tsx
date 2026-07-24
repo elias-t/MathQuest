@@ -28,8 +28,12 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
 
   const { data: problems, isLoading, isError } = useQuery<Problem[]>({
-    queryKey: ['problems'],
+    queryKey: ['problems', 'student'],
     queryFn: () => api.get('/problems/student'),
+    // Always refetch when the student lands here — new AI problems and updated
+    // statuses are generated while solving, and the global 5-min staleTime
+    // would otherwise show a stale list until a hard refresh.
+    refetchOnMount: 'always',
   });
 
   return (

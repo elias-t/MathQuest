@@ -8,6 +8,7 @@ interface Student {
   displayName: string;
   role: string;
   createdAt: string;
+  _count: { submissions: number };
 }
 
 export default function StudentsList() {
@@ -15,6 +16,7 @@ export default function StudentsList() {
   const { data: students, isLoading, isError } = useQuery<Student[]>({
     queryKey: ['students'],
     queryFn: () => api.get('/users?role=STUDENT'),
+    refetchOnMount: 'always', // keep submission counts fresh on each visit
   });
 
   if (isLoading) return <p className="text-ink-muted py-4">Loading…</p>;
@@ -27,10 +29,7 @@ export default function StudentsList() {
         <tr className="border-b border-line">
           <th className="px-4 py-3 font-semibold">Display name</th>
           <th className="px-4 py-3 font-semibold">Email</th>
-          <th className="px-4 py-3 font-semibold text-ink-muted">
-            {/* TODO: requires per-student submission count (N+1) — omitted for now */}
-            Submissions
-          </th>
+          <th className="px-4 py-3 font-semibold">Submissions</th>
         </tr>
       </thead>
       <tbody>
@@ -42,7 +41,7 @@ export default function StudentsList() {
           >
             <td className="px-4 py-3">{s.displayName}</td>
             <td className="px-4 py-3 text-ink-muted">{s.email}</td>
-            <td className="px-4 py-3 text-ink-muted">—</td>
+            <td className="px-4 py-3 text-ink-muted">{s._count.submissions}</td>
           </tr>
         ))}
       </tbody>
