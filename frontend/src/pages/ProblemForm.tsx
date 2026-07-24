@@ -8,7 +8,6 @@ import Button from '../components/ui/Button';
 
 type Props = { mode: 'create' | 'edit' };
 
-const inputClass = 'border border-line px-3 py-2 w-full font-sans focus:outline-none focus:border-brand';
 const labelClass = 'block font-semibold mb-1 text-sm';
 const fieldClass = 'mb-5';
 

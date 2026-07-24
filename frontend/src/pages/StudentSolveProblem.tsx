@@ -153,7 +153,7 @@ export default function StudentSolveProblem() {
           {result.aiFeedback && <p className="mb-4">{result.aiFeedback}</p>}
 
           {result.nextProblem ? (
-            <Button variant="primary" onClick={() => navigate(`/student/problems/${result.nextProblem.id}`)}>
+            <Button variant="primary" onClick={() => navigate(`/student/problems/${result.nextProblem?.id}`)}>
               Next problem
             </Button>
           ) : result.isCorrect ? (
