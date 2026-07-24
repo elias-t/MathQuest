@@ -25,7 +25,10 @@ interface SubmissionResult {
   createdAt: string;
   studentId: string;
   problemId: string;
-  nextProblem: { id: string; title: string } | null;
+  // The submit response no longer generates the next problem (that was slow).
+  // It returns only the direction; the next problem is generated on demand
+  // when the student clicks "Next problem". null = no next problem offered.
+  nextDirection: 'harder' | 'easier' | 'similar' | 'scaffold' | null;
 }
 
 export default function StudentSolveProblem() {
@@ -47,6 +50,7 @@ export default function StudentSolveProblem() {
   // TODO: submitting / hinting in-flight flags
   const [submitting, setSubmitting] = useState(false);
   const [requestingHint, setRequestingHint] = useState(false);
+  const [generatingNext, setGeneratingNext] = useState(false);
 
   // TODO: error message for failed submit or hint requests
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -85,6 +89,23 @@ export default function StudentSolveProblem() {
       setErrorMessage((err as Error).message ?? "Couldn't get a hint.");
     } finally {
       setRequestingHint(false);
+    }
+  }
+
+  // Generate the next problem on demand (moved off the submit path for speed).
+  async function handleNextProblem() {
+    if (!result?.nextDirection) return;
+    setGeneratingNext(true);
+    setErrorMessage(null);
+    try {
+      const next = await api.post(`/problems/${id}/generate-next`, {
+        direction: result.nextDirection,
+      });
+      navigate(`/student/problems/${next.id}`);
+    } catch (err) {
+      setErrorMessage((err as Error).message ?? "Couldn't generate the next problem.");
+    } finally {
+      setGeneratingNext(false);
     }
   }
 
@@ -152,9 +173,9 @@ export default function StudentSolveProblem() {
           </h2>
           {result.aiFeedback && <p className="mb-4">{result.aiFeedback}</p>}
 
-          {result.nextProblem ? (
-            <Button variant="primary" onClick={() => navigate(`/student/problems/${result.nextProblem?.id}`)}>
-              Next problem
+          {result.nextDirection ? (
+            <Button variant="primary" onClick={handleNextProblem} disabled={generatingNext}>
+              {generatingNext ? 'Generating…' : 'Next problem'}
             </Button>
           ) : result.isCorrect ? (
             <p className="text-ink-muted">Great job! No further problems generated yet.</p>

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
-import { ProblemsService, GenerationDirection } from '../problems/problems.service';
+import { GenerationDirection } from '../problems/problems.service';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 
 @Injectable()
@@ -9,7 +9,6 @@ export class SubmissionsService {
   constructor(
     private prisma: PrismaService,
     private aiService: AiService,
-    private problemsService: ProblemsService,
   ) {}
 
   async create(dto: CreateSubmissionDto, studentId: string) {
@@ -62,15 +61,13 @@ export class SubmissionsService {
       direction = 'scaffold';
     }
 
-    const nextProblem = direction
-      ? await this.problemsService.generateAndPersist(
-          dto.problemId,
-          direction,
-          studentId,
-        )
-      : null;
-
-    return { ...savedSubmission, nextProblem: nextProblem ?? null };
+    // Generation is DEFERRED to the client: the response returns only the
+    // direction (fast — just the validation call), and the frontend calls
+    // POST /problems/:id/generate-next when the student clicks "Next problem".
+    // This keeps the slow (~4.5s) Claude generation off the submit path. The
+    // gate above still fires at most once (first solve / 3rd miss), so a
+    // student is offered a next problem exactly when they were before.
+    return { ...savedSubmission, nextDirection: direction };
   }
 
   findMySubmissions(studentId: string) {
