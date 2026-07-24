@@ -106,6 +106,9 @@ export class UsersService {
         displayName: true,
         role: true,
         createdAt: true,
+        // Single-query aggregate (no N+1) so the teacher's Students list can
+        // show each student's submission count.
+        _count: { select: { submissions: true } },
       },
       orderBy: { displayName: 'asc' },
     });
