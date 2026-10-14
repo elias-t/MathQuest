@@ -100,14 +100,6 @@ export class ProblemsService {
       data: { ...dto, createdById: userId },
     });
 
-    void this.aiService.indexProblem(
-      problem.id,
-      problem.title,
-      problem.description,
-      problem.topic,
-      problem.difficulty,
-    );
-
     return problem;
   }
 
@@ -173,43 +165,7 @@ export class ProblemsService {
       },
     });
 
-    void this.aiService.indexProblem(
-      newProblem.id,
-      newProblem.title,
-      newProblem.description,
-      newProblem.topic,
-      newProblem.difficulty,
-    );
-
     return newProblem;
-  }
-
-  async recommend(studentId: string, lastProblemId?: string): Promise<any> {
-    const submissions = await this.prisma.submission.findMany({
-      where: { studentId },
-      include: { problem: { select: { topic: true } } },
-    });
-
-    const map = new Map<string, { correct: number; total: number }>();
-    for (const s of submissions) {
-      const t = s.problem.topic;
-      const entry = map.get(t) ?? { correct: 0, total: 0 };
-      entry.total += 1;
-      if (s.isCorrect) entry.correct += 1;
-      map.set(t, entry);
-    }
-    const topicPerformance = Array.from(map.entries()).map(([topic, v]) => ({
-      topic,
-      correct: v.correct,
-      total: v.total,
-    }));
-
-    const result = await this.aiService.getRecommendation(
-      studentId,
-      topicPerformance,
-      lastProblemId,
-    );
-    return result;
   }
 
   async getHint(problemId: string, previousHints: string[]): Promise<any> {
