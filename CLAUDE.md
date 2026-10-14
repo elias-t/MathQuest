@@ -86,8 +86,6 @@ npm run dev
 |--------|---------|-----------------|
 | `validateAnswer(problem, studentAnswer, correctAnswer)` | AI answer validation | POST `/validate` |
 | `getHint(problem, correctAnswer, previousHints)` | Progressive hint generation | POST `/hint` |
-| `indexProblem(id, title, description, topic, difficulty)` | Index a problem into ChromaDB | POST `/rag/index` |
-| `getRecommendation(topicPerformance, lastProblemId)` | RAG recommendation **(parked — no longer called from submissions)** | POST `/rag/recommend` |
 | `generateNext(solvedProblem, solvedMachineForm, variable, topic, difficulty, direction)` | Generate next adaptive problem | POST `/generate-next` |
 
 All methods log and return `null`/`void` on failure (graceful fallback).
@@ -95,8 +93,8 @@ URL configured via `AI_SERVICE_URL` env var (default: `http://localhost:8000`).
 
 **ProblemsService key methods:**
 
-- `create(...)` — saves problem, fires `indexProblem()` (fire-and-forget)
-- `generateAndPersist(sourceProblemId, direction, studentId)` — calls AI generation, persists result as a new Problem row with `aiGenerated=true`, inherits `createdById` from source, **stamps `generatedForId=studentId`** (the owning student), and indexes the new problem into ChromaDB
+- `create(...)` — saves problem
+- `generateAndPersist(sourceProblemId, direction, studentId)` — calls AI generation, persists result as a new Problem row with `aiGenerated=true`, inherits `createdById` from source, **stamps `generatedForId=studentId`** (the owning student)
 - `findAllForStudent(studentId)` — returns problems visible to one student (`aiGenerated=false` OR `generatedForId=studentId`), each with a computed per-student `status` derived from that student's own submissions: `NOT_ATTEMPTED` | `ATTEMPTED` | `SOLVED_FIRST_TRY` | `SOLVED_LATER`
 
 **SubmissionsService.create() flow:**
@@ -204,7 +202,7 @@ Each direction's prompt includes explicit `VALID:` / `INVALID:` examples. Withou
 
 ### RAG flow (parked)
 
-The RAG endpoints remain functional but **are no longer called from the submission flow** — generation replaces the recommendation role. ChromaDB is still indexed on every problem create (including AI-generated ones), keeping the option open for future natural-language search.
+Generation replaces the recommendation role in the submission flow. NestJS no longer calls the RAG endpoints at all — `AiService.indexProblem()`/`getRecommendation()` and the `POST /problems/recommend` route were removed (they only ever hit the disabled, 404ing `/rag/index` and `/rag/recommend` endpoints below). Problems are no longer indexed anywhere on create.
 
 **Reserved for:** future "I'm confused about X" natural-language search across the problem bank — the one use case where semantic similarity genuinely beats a `WHERE` clause, because the input is freeform language with no structured columns to filter by.
 
@@ -295,7 +293,7 @@ Model vars are optional — each call site falls back to the defaults above if u
 
 ## RAG: Parked, ChromaDB Removed from Deployment
 
-> **⚠️ Update:** ChromaDB has been **removed from the deployed AI service** and the `rag` router is **no longer registered** in `app/main.py`. ChromaDB doesn't fit Azure App Service's Free tier — it bundles a heavy ML stack for in-process embeddings, needs a newer system `sqlite3` than the container ships, and its build/cold-start burns through F1's daily CPU quota. `chromadb` and its `chroma_client` are gone from `requirements.txt` and startup. The `rag/` package and `app/routers/rag.py` files **remain in the repo for reference** but are dead code until reimplemented. **RAG will return on Azure AI Search** (managed vector store + API-based embeddings, e.g. Azure OpenAI) — the Azure-native design that keeps the App Service lightweight. The `/rag/index` and `/rag/recommend` endpoints therefore return 404 in the deployed service; the NestJS `indexProblem` call is fire-and-forget and fails gracefully (a follow-up should remove it).
+> **⚠️ Update:** ChromaDB has been **removed from the deployed AI service** and the `rag` router is **no longer registered** in `app/main.py`. ChromaDB doesn't fit Azure App Service's Free tier — it bundles a heavy ML stack for in-process embeddings, needs a newer system `sqlite3` than the container ships, and its build/cold-start burns through F1's daily CPU quota. `chromadb` and its `chroma_client` are gone from `requirements.txt` and startup. The `rag/` package and `app/routers/rag.py` files **remain in the repo for reference** but are dead code until reimplemented. **RAG will return on Azure AI Search** (managed vector store + API-based embeddings, e.g. Azure OpenAI) — the Azure-native design that keeps the App Service lightweight. The `/rag/index` and `/rag/recommend` endpoints therefore return 404 in the deployed service. **The NestJS side has since been cleaned up**: `AiService.indexProblem()`/`getRecommendation()`, the `POST /problems/recommend` route, `ProblemsService.recommend()`, and `RecommendDto` were all removed — nothing in NestJS calls the dead endpoints anymore.
 
 RAG (ChromaDB + semantic recommendation) was implemented end-to-end, but is **no longer wired into the submission flow** — generation replaced it — and now **not deployed at all** (per the note above). The design sketch below still applies, but substitute Azure AI Search for ChromaDB as the vector store.
 

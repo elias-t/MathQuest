@@ -16,7 +16,6 @@ import { CreateProblemDto } from './dto/create-problem.dto';
 import { UpdateProblemDto } from './dto/update-problem.dto';
 import { GetHintDto } from './dto/get-hint.dto';
 import { GenerateNextDto } from './dto/generate-next.dto';
-import { RecommendDto } from './dto/recommend.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import type { AuthRequest } from '../auth/auth-request.interface';
 
@@ -57,14 +56,6 @@ export class ProblemsController {
   remove(@Param('id') id: string, @Request() req: AuthRequest) {
     if (req.user.role !== 'TEACHER') throw new ForbiddenException('Only teachers can manage problems');
     return this.problemsService.remove(id, req.user.userId);
-  }
-
-  @Post('recommend')
-  async recommend(@Body() dto: RecommendDto = {}, @Request() req: AuthRequest) {
-    if (req.user.role !== 'STUDENT') throw new ForbiddenException('Only students can request recommendations');
-    const result = await this.problemsService.recommend(req.user.userId, dto?.lastProblemId);
-    if (!result) throw new ServiceUnavailableException('No recommendation available yet');
-    return result;
   }
 
   @Get(':id/stats')
