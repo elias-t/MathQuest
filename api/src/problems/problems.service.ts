@@ -71,6 +71,7 @@ export class ProblemsService {
             firstCorrectAttempt === 1 ? 'SOLVED_FIRST_TRY' : 'SOLVED_LATER';
         }
       }
+      const solved = status === 'SOLVED_FIRST_TRY' || status === 'SOLVED_LATER';
       return {
         id: p.id,
         title: p.title,
@@ -78,6 +79,7 @@ export class ProblemsService {
         difficulty: p.difficulty,
         aiGenerated: p.aiGenerated,
         status,
+        solution: solved ? p.correctAnswer : null,
       };
     });
   }
