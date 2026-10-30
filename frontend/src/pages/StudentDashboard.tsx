@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,6 +12,7 @@ interface Problem {
   difficulty: number;
   aiGenerated: boolean;
   status: 'NOT_ATTEMPTED' | 'ATTEMPTED' | 'SOLVED_FIRST_TRY' | 'SOLVED_LATER';
+  solution: string | null;
 }
 
 const STATUS_META: Record<
@@ -23,9 +25,14 @@ const STATUS_META: Record<
   SOLVED_LATER: { label: 'Solved (retried)', dot: 'bg-amber-500', text: 'text-amber-700' },
 };
 
+function isSolved(status: Problem['status']) {
+  return status === 'SOLVED_FIRST_TRY' || status === 'SOLVED_LATER';
+}
+
 export default function StudentDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
 
   const { data: problems, isLoading, isError } = useQuery<Problem[]>({
     queryKey: ['problems', 'student'],
@@ -35,6 +42,15 @@ export default function StudentDashboard() {
     // would otherwise show a stale list until a hard refresh.
     refetchOnMount: 'always',
   });
+
+  function toggleSolution(id: string) {
+    setRevealedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
     <PageContainer>
@@ -55,16 +71,24 @@ export default function StudentDashboard() {
               <th className="px-4 py-3 font-semibold">Difficulty</th>
               <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold">Source</th>
+              <th className="px-4 py-3 font-semibold">Solution</th>
             </tr>
           </thead>
           <tbody>
             {problems.map((p) => {
               const meta = STATUS_META[p.status];
+              const solved = isSolved(p.status);
+              const revealed = revealedIds.has(p.id);
               return (
                 <tr
                   key={p.id}
-                  className="border-b border-line cursor-pointer hover:bg-gray-50"
-                  onClick={() => navigate(`/student/problems/${p.id}`)}
+                  className={`border-b border-line ${
+                    solved ? '' : 'cursor-pointer hover:bg-gray-50'
+                  }`}
+                  onClick={() => {
+                    if (solved) return;
+                    navigate(`/student/problems/${p.id}`);
+                  }}
                 >
                   <td className="px-4 py-3">{p.title}</td>
                   <td className="px-4 py-3 text-ink-muted">{p.topic}</td>
@@ -86,6 +110,22 @@ export default function StudentDashboard() {
                     >
                       {p.aiGenerated ? 'AI' : 'Teacher'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {solved ? (
+                      <button
+                        type="button"
+                        className="text-sm underline text-ink-muted hover:text-ink"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSolution(p.id);
+                        }}
+                      >
+                        {revealed ? `Hide: ${p.solution}` : 'Show solution'}
+                      </button>
+                    ) : (
+                      <span className="text-ink-muted text-sm">—</span>
+                    )}
                   </td>
                 </tr>
               );
