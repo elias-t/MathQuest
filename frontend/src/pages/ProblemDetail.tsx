@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/auth';
 import PageContainer from '../components/layout/PageContainer';
 import Breadcrumb from '../components/layout/Breadcrumb';
 import Button from '../components/ui/Button';

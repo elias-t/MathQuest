@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/auth';
 import { api } from '../lib/api';
 import PageContainer from '../components/layout/PageContainer';
 import Button from '../components/ui/Button';
@@ -23,8 +23,8 @@ export default function LoginPage() {
       });
       const user = await signIn(res.access_token);
       navigate(user.role === 'TEACHER' ? '/dashboard' : '/student');
-    } catch (err: any) {
-      setError(err.message ?? 'Login failed');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setSubmitting(false);
     }

@@ -35,24 +35,24 @@ export default function StudentSolveProblem() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  // TODO: form state for the student's answer
+  // The student's current answer input
   const [answer, setAnswer] = useState('');
 
-  // TODO: hints the student has unlocked so far this session
+  // Hints the student has unlocked so far this session
   const [hints, setHints] = useState<string[]>([]);
 
-  // TODO: timing - when did the student start? (Date.now() on mount)
-  const [startTime] = useState(Date.now());
+  // When the student started (Date.now() on mount), used for timeTaken
+  const [startTime] = useState(() => Date.now());
 
-  // TODO: result from the most recent submission (null until submit)
+  // Result from the most recent submission (null until submit)
   const [result, setResult] = useState<SubmissionResult | null>(null);
 
-  // TODO: submitting / hinting in-flight flags
+  // In-flight flags: submitting an answer, requesting a hint, generating the next problem
   const [submitting, setSubmitting] = useState(false);
   const [requestingHint, setRequestingHint] = useState(false);
   const [generatingNext, setGeneratingNext] = useState(false);
 
-  // TODO: error message for failed submit or hint requests
+  // Error message for failed submit, hint, or next-problem requests
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { data: problem, isLoading, isError } = useQuery<Problem>({

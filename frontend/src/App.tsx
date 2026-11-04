@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './contexts/auth';
 import AppHeader from './components/layout/AppHeader';
 import RequireRole from './components/routing/RequireRole';
 import LoginPage from './pages/LoginPage';
