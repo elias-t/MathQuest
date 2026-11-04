@@ -12,7 +12,10 @@ async function request(path: string, options?: RequestInit) {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw Object.assign(new Error(body.message ?? res.statusText), { status: res.status });
+    const message = Array.isArray(body.message)
+      ? body.message.join('; ')
+      : (body.message ?? res.statusText);
+    throw Object.assign(new Error(message), { status: res.status });
   }
   return res.json();
 }
