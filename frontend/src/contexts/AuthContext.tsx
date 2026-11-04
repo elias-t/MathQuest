@@ -1,35 +1,15 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { api } from '../lib/api';
-
-export interface AuthUser {
-  userId: string;
-  email: string;
-  displayName: string;
-  role: 'TEACHER' | 'STUDENT';
-}
-
-interface AuthContextValue {
-  user: AuthUser | null;
-  loading: boolean;
-  signIn: (token: string) => Promise<AuthUser>;
-  signOut: () => void;
-}
-
-const AuthContext = createContext<AuthContextValue>({
-  user: null,
-  loading: true,
-  signIn: async () => { throw new Error('AuthProvider not mounted'); },
-  signOut: () => {},
-});
+import { AuthContext, type AuthUser } from './auth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !!localStorage.getItem('token'));
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) { setLoading(false); return; }
+    if (!token) return;
     api.get('/auth/me')
       .then((me: AuthUser) => setUser(me))
       .catch(() => localStorage.removeItem('token'))
@@ -53,8 +33,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  return useContext(AuthContext);
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, type ChangeEvent, type FormEvent} from 'react';
+import { useState, type ChangeEvent, type FormEvent} from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -73,21 +73,23 @@ export default function ProblemForm({ mode }: Props) {
     enabled: mode === 'edit' && !!id,
   });
 
-  useEffect(() => {
-    if (problem) {
-      setForm({
-        title: problem.title,
-        description: problem.description,
-        topic: problem.topic,
-        difficulty: problem.difficulty,
-        ageGroup: problem.ageGroup,
-        correctAnswer: problem.correctAnswer,
-        hints: problem.hints ?? '',
-        machineForm: problem.machineForm ?? '',
-        variable: problem.variable ?? '',
-      });
-    }
-  }, [problem]);
+  // Seed the form whenever a (new) problem arrives. Adjusting state during render
+  // (rather than in an effect) avoids a cascading synchronous setState.
+  const [seededFrom, setSeededFrom] = useState<typeof problem>(undefined);
+  if (problem && problem !== seededFrom) {
+    setSeededFrom(problem);
+    setForm({
+      title: problem.title,
+      description: problem.description,
+      topic: problem.topic,
+      difficulty: problem.difficulty,
+      ageGroup: problem.ageGroup,
+      correctAnswer: problem.correctAnswer,
+      hints: problem.hints ?? '',
+      machineForm: problem.machineForm ?? '',
+      variable: problem.variable ?? '',
+    });
+  }
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
@@ -111,8 +113,8 @@ export default function ProblemForm({ mode }: Props) {
         queryClient.invalidateQueries({ queryKey: ['problem', id] });
         navigate(`/problems/${id}`);
       }
-    } catch (err: any) {
-      setSubmitError(err?.response?.data?.message ?? 'Something went wrong');
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setSubmitting(false);
     }
