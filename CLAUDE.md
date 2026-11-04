@@ -75,7 +75,7 @@ npm run dev
 | PATCH | `/problems/:id` | TEACHER + owner | Update problem |
 | DELETE | `/problems/:id` | TEACHER + owner | Delete problem |
 | POST | `/problems/:id/hint` | JWT | Get AI hint for problem |
-| POST | `/problems/:id/generate-next` | JWT | Generate next problem (`direction` = harder \| easier \| scaffold) — **persists the result** |
+| POST | `/problems/:id/generate-next` | JWT | Generate next problem (`direction` = harder \| easier \| similar \| scaffold) — **persists the result** |
 | POST | `/submissions` | STUDENT | Submit answer — response includes `nextProblem` when applicable |
 | GET | `/submissions/my` | STUDENT | My submission history |
 | GET | `/submissions/problem/:id` | TEACHER + owner | All submissions for a problem |
@@ -171,7 +171,7 @@ ai-service/
 | POST | `/hint` | active | Generates progressive hint using Claude tool use |
 | POST | `/rag/index` | **disabled** | Router not registered (ChromaDB removed) — returns 404 |
 | POST | `/rag/recommend` | **disabled** | Router not registered (ChromaDB removed) — returns 404 |
-| POST | `/generate-next` | active | Generates a calibrated next problem (harder/easier/scaffold) |
+| POST | `/generate-next` | active | Generates a calibrated next problem (harder/easier/similar/scaffold) |
 
 **All Claude calls use tool use** (`tool_choice: {"type": "tool", "name": "..."}`) for structured output. Each call site reads its model from a **per-purpose env var** (see Environment Variables): `HINT_MODEL` (default `claude-haiku-4-5`), `VALIDATOR_MODEL`, `GENERATOR_MODEL`, `RECOMMEND_MODEL` (default `claude-sonnet-4-6`). The retired `claude-sonnet-4-20250514` has been removed from the codebase.
 
@@ -194,9 +194,10 @@ ai-service/
 |-----------|---------------------|
 | `harder`  | Introduce ONE new technique (combine like terms, distribution, variable on both sides). Difficulty +1. |
 | `easier`  | REMOVE one technique (reduce a multi-step equation to one-step). Difficulty -1. |
+| `similar` | Keep the same structure and number of steps, but use different numbers or coefficients. Difficulty unchanged (delta 0). |
 | `scaffold`| Apply ONE solving step to the failed problem (e.g. `3x+2=8` → `3x=6`). Same solution preserved. Difficulty -1. |
 
-Each direction's prompt includes explicit `VALID:` / `INVALID:` examples. Without these, Claude defaults to surface-level "harder = bigger numbers" / "easier = smaller numbers" — pedagogical progression requires the examples.
+The `harder`, `easier` and `scaffold` prompts include explicit `VALID:` / `INVALID:` examples (`similar` has none yet). Without these, Claude defaults to surface-level "harder = bigger numbers" / "easier = smaller numbers" — pedagogical progression requires the examples.
 
 **Difficulty is computed deterministically in NestJS** (`source.difficulty ± 1`, clamped 1-10) — Claude unreliably moves the number itself.
 
@@ -284,7 +285,7 @@ Model vars are optional — each call site falls back to the defaults above if u
 - **All Claude calls use tool use** (`tool_choice: {"type": "tool", "name": "..."}`) for structured output. Each call site reads its model from a per-purpose env var (`HINT_MODEL`, `VALIDATOR_MODEL`, `GENERATOR_MODEL`, `RECOMMEND_MODEL`) — no longer a single shared string.
 - **AI prompts requiring precise behaviour** (especially `generation/generator.py` direction guidance) MUST include explicit `VALID:` / `INVALID:` examples. Without them, Claude defaults to surface-level interpretation (numerical scaling instead of pedagogical scaling).
 - **The validator must NOT reveal the answer on a wrong submission** — `ai_validator.py`'s prompt and the `feedback` tool-field description both forbid stating the correct answer or solution steps when the student is incorrect; feedback is a nudge toward the approach only. (Correct answers may reference the value.)
-- **Generated problems are persisted** with `aiGenerated=true`, inherit `createdById` from their source, and are indexed into ChromaDB on save.
+- **Generated problems are persisted** with `aiGenerated=true`, inherit `createdById` from their source, and are **not** indexed anywhere on save (ChromaDB indexing was removed; `generateAndPersist` only writes the Problem row).
 - **Difficulty stepping is deterministic in NestJS** (`±1`, clamped 1-10) — never trust the model's difficulty field.
 - **Sympy verification** runs in `generation/verify.py`. `verify()` checks the generated problem is internally consistent; `solution_preserved()` (scaffold only) checks the generated equation solves to the same value as the original.
 - **`password` is excluded globally** via Prisma's `omit` in `prisma.service.ts` — new User-returning queries are safe by default, no `select` required for this. Only login opts back in (`omit: { password: false }`). Don't remove the `omitApi` preview flag from `schema.prisma` — the guard depends on it until Prisma is upgraded to 6+ (where it's GA).

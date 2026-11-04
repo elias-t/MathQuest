@@ -12,7 +12,6 @@ const labelClass = 'block font-semibold mb-1 text-sm';
 const fieldClass = 'mb-5';
 
 export default function ProblemForm({ mode }: Props) {
-  console.log('ProblemForm mounted, mode:', mode);
   const { id } = useParams<{ id: string }>();
   
   type ProblemFormState = {
