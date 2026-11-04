@@ -13,7 +13,7 @@ async function request(path: string, options?: RequestInit) {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const message = Array.isArray(body.message)
-      ? body.message.join('; ')
+      ? body.message.join('; ') || res.statusText
       : (body.message ?? res.statusText);
     throw Object.assign(new Error(message), { status: res.status });
   }

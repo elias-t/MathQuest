@@ -197,7 +197,7 @@ ai-service/
 | `similar` | Keep the same structure and number of steps, but use different numbers or coefficients. Difficulty unchanged (delta 0). |
 | `scaffold`| Apply ONE solving step to the failed problem (e.g. `3x+2=8` → `3x=6`). Same solution preserved. Difficulty -1. |
 
-Each direction's prompt includes explicit `VALID:` / `INVALID:` examples. Without these, Claude defaults to surface-level "harder = bigger numbers" / "easier = smaller numbers" — pedagogical progression requires the examples.
+The `harder`, `easier` and `scaffold` prompts include explicit `VALID:` / `INVALID:` examples (`similar` has none yet). Without these, Claude defaults to surface-level "harder = bigger numbers" / "easier = smaller numbers" — pedagogical progression requires the examples.
 
 **Difficulty is computed deterministically in NestJS** (`source.difficulty ± 1`, clamped 1-10) — Claude unreliably moves the number itself.
 
