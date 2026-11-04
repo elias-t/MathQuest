@@ -42,7 +42,7 @@ export default function StudentSolveProblem() {
   const [hints, setHints] = useState<string[]>([]);
 
   // When the student started (Date.now() on mount), used for timeTaken
-  const [startTime] = useState(Date.now());
+  const [startTime] = useState(() => Date.now());
 
   // Result from the most recent submission (null until submit)
   const [result, setResult] = useState<SubmissionResult | null>(null);
