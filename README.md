@@ -9,7 +9,7 @@ On each submission, the API decides — based on correctness and attempt count �
 ```
 MathQuest/
 ├── api/          ← NestJS REST API (TypeScript, Prisma, PostgreSQL)
-├── ai-service/   ← Python FastAPI AI service (Claude, ChromaDB, sympy)
+├── ai-service/   ← Python FastAPI AI service (Claude, sympy)
 ├── frontend/     ← React + Vite frontend
 ├── postman/      ← API collections
 └── docker-compose.yml
@@ -53,13 +53,12 @@ ANTHROPIC_API_KEY=...
 HINT_MODEL=claude-haiku-4-5
 VALIDATOR_MODEL=claude-sonnet-4-6
 GENERATOR_MODEL=claude-sonnet-4-6
-RECOMMEND_MODEL=claude-sonnet-4-6
 ```
 
 ## Stack
 
 - **api/** — NestJS, Prisma, PostgreSQL, Passport JWT
-- **ai-service/** — FastAPI, Anthropic SDK (tool use for structured output), ChromaDB, sympy
+- **ai-service/** — FastAPI, Anthropic SDK (tool use for structured output), sympy
 - **frontend/** — React, Vite, TanStack Query, React Router
 
 See [CLAUDE.md](CLAUDE.md) for a full breakdown of modules, routes, schemas, and conventions.

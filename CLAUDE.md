@@ -133,7 +133,7 @@ URL configured via `AI_SERVICE_URL` env var (default: `http://localhost:8000`).
 
 ## ai-service/ — Python FastAPI
 
-**Stack:** FastAPI, Anthropic SDK, sympy, uvicorn (ChromaDB removed for Azure — see "RAG: Parked, ChromaDB Removed from Deployment")
+**Stack:** FastAPI, Anthropic SDK, sympy, uvicorn (ChromaDB/RAG code deleted — see "RAG: Deleted, Planned on Azure AI Search")
 
 **Entry point:** `ai-service/app/main.py` — listens on port 8000
 
@@ -141,23 +141,16 @@ URL configured via `AI_SERVICE_URL` env var (default: `http://localhost:8000`).
 
 ```
 ai-service/
-├── chroma_client.py         ← ChromaDB singleton ("problems" collection)
 ├── app/
 │   ├── main.py              ← FastAPI app, routers registered here
 │   ├── models/schemas.py    ← Pydantic request/response models
 │   ├── routers/
 │   │   ├── validation.py    ← POST /validate
 │   │   ├── hints.py         ← POST /hint
-│   │   ├── rag.py           ← POST /rag/index, POST /rag/recommend   (parked)
 │   │   └── generation.py    ← POST /generate-next                    (active)
 │   └── services/
 │       ├── ai_validator.py  ← validate_answer() — Claude call (VALIDATOR_MODEL)
 │       └── ai_hint.py        ← generate_hint()   — Claude call (HINT_MODEL)
-├── rag/                     ← parked — code intact, not invoked from submissions
-│   ├── ingest.py            ← index_problem()
-│   ├── retrieval.py         ← query_problems()
-│   ├── prompts.py           ← build_recommendation_prompt()
-│   └── chains.py            ← recommend_next_problem()
 └── generation/              ← AI problem generation, sympy-verified
     ├── generator.py         ← GENERATE_TOOL + generate_problem() + direction guidance
     └── verify.py            ← verify() + solution_preserved()
@@ -169,11 +162,11 @@ ai-service/
 |--------|------|--------|-------------|
 | POST | `/validate` | active | Validates student answer using Claude tool use |
 | POST | `/hint` | active | Generates progressive hint using Claude tool use |
-| POST | `/rag/index` | **disabled** | Router not registered (ChromaDB removed) — returns 404 |
-| POST | `/rag/recommend` | **disabled** | Router not registered (ChromaDB removed) — returns 404 |
+| POST | `/rag/index` | **removed** | Code deleted — returns 404 |
+| POST | `/rag/recommend` | **removed** | Code deleted — returns 404 |
 | POST | `/generate-next` | active | Generates a calibrated next problem (harder/easier/similar/scaffold) |
 
-**All Claude calls use tool use** (`tool_choice: {"type": "tool", "name": "..."}`) for structured output. Each call site reads its model from a **per-purpose env var** (see Environment Variables): `HINT_MODEL` (default `claude-haiku-4-5`), `VALIDATOR_MODEL`, `GENERATOR_MODEL`, `RECOMMEND_MODEL` (default `claude-sonnet-4-6`). The retired `claude-sonnet-4-20250514` has been removed from the codebase.
+**All Claude calls use tool use** (`tool_choice: {"type": "tool", "name": "..."}`) for structured output. Each call site reads its model from a **per-purpose env var** (see Environment Variables): `HINT_MODEL` (default `claude-haiku-4-5`), `VALIDATOR_MODEL`, `GENERATOR_MODEL`. The retired `claude-sonnet-4-20250514` has been removed from the codebase.
 
 ### Generation flow (`/generate-next`)
 
@@ -201,24 +194,9 @@ The `harder`, `easier` and `scaffold` prompts include explicit `VALID:` / `INVAL
 
 **Difficulty is computed deterministically in NestJS** (`source.difficulty ± 1`, clamped 1-10) — Claude unreliably moves the number itself.
 
-### RAG flow (parked)
+### RAG / ChromaDB (deleted)
 
-Generation replaces the recommendation role in the submission flow. NestJS no longer calls the RAG endpoints at all — `AiService.indexProblem()`/`getRecommendation()` and the `POST /problems/recommend` route were removed (they only ever hit the disabled, 404ing `/rag/index` and `/rag/recommend` endpoints below). Problems are no longer indexed anywhere on create.
-
-**Reserved for:** future "I'm confused about X" natural-language search across the problem bank — the one use case where semantic similarity genuinely beats a `WHERE` clause, because the input is freeform language with no structured columns to filter by.
-
-### ChromaDB
-
-- Persistent storage in `./chroma_data`
-- Collection: `"problems"` with `DefaultEmbeddingFunction` (all-MiniLM-L6-v2)
-- Metadata per problem: `problem_id`, `title`, `topic`, `difficulty`
-- `upsert` is used (not `add`) — safe to re-index
-- `retrieval.py` guards against empty collection
-
-**Known dev gotcha:** repeated creation of identical problems can leave stale duplicates. If recommendations start saying "all candidates are identical," reset the store:
-```powershell
-Remove-Item -Recurse -Force ai-service\chroma_data
-```
+Generation replaced the recommendation role in the submission flow, and the ChromaDB-based RAG code (`rag/`, `app/routers/rag.py`, `chroma_client.py`) has been deleted from `ai-service/`. NestJS no longer calls any RAG endpoints (`AiService.indexProblem()`/`getRecommendation()` and `POST /problems/recommend` were removed earlier). Original implementation: see git history at `7d63587`. See "RAG: Deleted, Planned on Azure AI Search" below.
 
 ### Key schemas (`app/models/schemas.py`):
 
@@ -247,9 +225,8 @@ ANTHROPIC_API_KEY=...
 HINT_MODEL=claude-haiku-4-5
 VALIDATOR_MODEL=claude-sonnet-4-6
 GENERATOR_MODEL=claude-sonnet-4-6
-RECOMMEND_MODEL=claude-sonnet-4-6
 ```
-Model vars are optional — each call site falls back to the defaults above if unset. `chroma_data/` is gitignored (runtime state, regenerated on startup).
+Model vars are optional — each call site falls back to the defaults above if unset. A leftover `chroma_data/` directory is gitignored and can be deleted.
 
 ---
 
@@ -280,9 +257,8 @@ Model vars are optional — each call site falls back to the defaults above if u
 - NestJS role checks are inline in controllers (`if (req.user.role !== 'TEACHER')`)
 - Ownership checks (update/delete) are in the service layer
 - AI service failures are silent — NestJS falls back gracefully (`null` checks, string comparison for submissions, 503 for hints, null `nextProblem` for generation)
-- ChromaDB uses `upsert` not `add` — safe to re-index problems
-- Python imports run from `ai-service/` as working directory (`from chroma_client import ...`, `from rag.chains import ...`, `from generation.generator import ...`)
-- **All Claude calls use tool use** (`tool_choice: {"type": "tool", "name": "..."}`) for structured output. Each call site reads its model from a per-purpose env var (`HINT_MODEL`, `VALIDATOR_MODEL`, `GENERATOR_MODEL`, `RECOMMEND_MODEL`) — no longer a single shared string.
+- Python imports run from `ai-service/` as working directory (`from generation.generator import ...`)
+- **All Claude calls use tool use** (`tool_choice: {"type": "tool", "name": "..."}`) for structured output. Each call site reads its model from a per-purpose env var (`HINT_MODEL`, `VALIDATOR_MODEL`, `GENERATOR_MODEL`) — no longer a single shared string.
 - **AI prompts requiring precise behaviour** (especially `generation/generator.py` direction guidance) MUST include explicit `VALID:` / `INVALID:` examples. Without them, Claude defaults to surface-level interpretation (numerical scaling instead of pedagogical scaling).
 - **The validator must NOT reveal the answer on a wrong submission** — `ai_validator.py`'s prompt and the `feedback` tool-field description both forbid stating the correct answer or solution steps when the student is incorrect; feedback is a nudge toward the approach only. (Correct answers may reference the value.)
 - **Generated problems are persisted** with `aiGenerated=true`, inherit `createdById` from their source, and are **not** indexed anywhere on save (ChromaDB indexing was removed; `generateAndPersist` only writes the Problem row).
@@ -292,13 +268,13 @@ Model vars are optional — each call site falls back to the defaults above if u
 
 ---
 
-## RAG: Parked, ChromaDB Removed from Deployment
+## RAG: Deleted, Planned on Azure AI Search
 
-> **⚠️ Update:** ChromaDB has been **removed from the deployed AI service** and the `rag` router is **no longer registered** in `app/main.py`. ChromaDB doesn't fit Azure App Service's Free tier — it bundles a heavy ML stack for in-process embeddings, needs a newer system `sqlite3` than the container ships, and its build/cold-start burns through F1's daily CPU quota. `chromadb` and its `chroma_client` are gone from `requirements.txt` and startup. The `rag/` package and `app/routers/rag.py` files **remain in the repo for reference** but are dead code until reimplemented. **RAG will return on Azure AI Search** (managed vector store + API-based embeddings, e.g. Azure OpenAI) — the Azure-native design that keeps the App Service lightweight. The `/rag/index` and `/rag/recommend` endpoints therefore return 404 in the deployed service. **The NestJS side has since been cleaned up**: `AiService.indexProblem()`/`getRecommendation()`, the `POST /problems/recommend` route, `ProblemsService.recommend()`, and `RecommendDto` were all removed — nothing in NestJS calls the dead endpoints anymore.
+> **⚠️ Update:** ChromaDB and the RAG code have been **deleted from `ai-service/`** (`rag/`, `app/routers/rag.py`, `chroma_client.py`; `chromadb` is not in `requirements.txt`). ChromaDB didn't fit Azure App Service's Free tier — it bundles a heavy ML stack for in-process embeddings, needs a newer system `sqlite3` than the container ships, and its build/cold-start burns through F1's daily CPU quota. The original implementation is in git history at `7d63587`. **RAG will return on Azure AI Search** (managed vector store + API-based embeddings, e.g. Azure OpenAI) — the Azure-native design that keeps the App Service lightweight. The `/rag/index` and `/rag/recommend` endpoints return 404. Nothing in NestJS calls them (`AiService.indexProblem()`/`getRecommendation()`, `POST /problems/recommend`, `ProblemsService.recommend()` and `RecommendDto` were removed).
 
-RAG (ChromaDB + semantic recommendation) was implemented end-to-end, but is **no longer wired into the submission flow** — generation replaced it — and now **not deployed at all** (per the note above). The design sketch below still applies, but substitute Azure AI Search for ChromaDB as the vector store.
+RAG (ChromaDB + semantic recommendation) was implemented end-to-end, but was dropped from the submission flow when generation replaced it, and is now deleted. The design sketch below still applies, but uses Azure AI Search as the vector store.
 
-**Why parked:** for the recommend-next-problem use case, RAG's semantic search was constrained by topic filters to the point where a plain SQL query did the same job more transparently. Generation produces calibrated problems on demand, which is a genuinely AI-shaped task that retrieval can't do.
+**Why it was shelved:** for the recommend-next-problem use case, RAG's semantic search was constrained by topic filters to the point where a plain SQL query did the same job more transparently. Generation produces calibrated problems on demand, which is a genuinely AI-shaped task that retrieval can't do.
 
 **Where RAG will return:** a future natural-language feature ("I'm confused about X" search across the problem bank) — the one use case where embeddings genuinely beat a `WHERE` clause, because the input is freeform language with no structured columns to filter by.
 
@@ -306,7 +282,7 @@ RAG (ChromaDB + semantic recommendation) was implemented end-to-end, but is **no
 
 The pipeline splits into two independent stages. Only the second one involves Claude — the first is a plain vector search with no LLM call:
 
-1. **Retrieval — no prompt, no Claude.** Reuse `chroma_client.problems_collection` (already indexed on every problem create). Add a new function alongside `rag/retrieval.py::query_problems()` that embeds the student's freeform sentence directly instead of a topic keyword, and drops the topic `where` filter so it searches the whole bank by embedding distance:
+1. **Retrieval — no prompt, no Claude.** Build this on Azure AI Search (the old `chroma_client.problems_collection` and `rag/retrieval.py::query_problems()` were deleted; see git history at 7d63587). Add a new function that embeds the student's freeform sentence directly instead of a topic keyword, and drops the topic `where` filter so it searches the whole bank by embedding distance. The snippet below is illustrative ChromaDB-style pseudocode; swap in the Azure AI Search client when building it:
    ```python
    def query_by_text(student_query: str, n_results: int = 5) -> list[dict]:
        count = problems_collection.count()
@@ -317,11 +293,11 @@ The pipeline splits into two independent stages. Only the second one involves Cl
            n_results=min(n_results, count),
            # no `where` — search across all topics, ranked by similarity alone
        )
-       # ...same candidate-building loop as query_problems()
+       # ...build the candidate list (id, title, topic, difficulty, description) from the results
    ```
-   `query_problems()` itself stays untouched — this is a new function, since the topic-scoped version is still what the parked recommend flow uses if that ever comes back.
+   The old topic-scoped `query_problems()` is gone (see git history); this is a new function.
 
-2. **Claude pass over the candidates — one specific prompt, forced tool use.** Same shape as `RECOMMEND_TOOL` / `build_recommendation_prompt()` in `rag/chains.py`: hand Claude the retrieved candidates and ask it to pick the one that matches the *concept* the student is stuck on, not just shared keywords. Needs the same `VALID:`/`INVALID:` example treatment as `generation/generator.py` — without it, Claude will default to surface keyword matching (e.g. picking anything with "fraction" in the title) instead of matching the actual sticking point.
+2. **Claude pass over the candidates — one specific prompt, forced tool use.** Same shape as `RECOMMEND_TOOL` / `build_recommendation_prompt()` in the deleted `rag/chains.py`: hand Claude the retrieved candidates and ask it to pick the one that matches the *concept* the student is stuck on, not just shared keywords. Needs the same `VALID:`/`INVALID:` example treatment as `generation/generator.py` — without it, Claude will default to surface keyword matching (e.g. picking anything with "fraction" in the title) instead of matching the actual sticking point.
    ```python
    CONFUSION_MATCH_TOOL = {
        "name": "submit_match",
@@ -339,7 +315,7 @@ The pipeline splits into two independent stages. Only the second one involves Cl
    ```
    Prompt template: present the student's raw query + the candidate list (id, title, topic, difficulty, description), instruct Claude to match on concept over vocabulary, give one `VALID:` example (query mentions "moving x's to one side" → matches a variables-on-both-sides problem even without shared wording) and one `INVALID:` example (query says "fractions" → wrongly picks a problem just because the word appears, when the real sticking point — e.g. unlike denominators — isn't what that problem tests).
 
-**Remaining scope to actually ship it:** the two pieces above, plus a new FastAPI router endpoint exposing it, a NestJS controller/service method forwarding to it, and a frontend search box on the student dashboard. Nothing else in the existing RAG/generation code needs to change.
+**Remaining scope to actually ship it:** the two pieces above, plus a new FastAPI router endpoint exposing it, a NestJS controller/service method forwarding to it, and a frontend search box on the student dashboard. Nothing in the existing generation code needs to change.
 
 ---
 
@@ -347,5 +323,5 @@ The pipeline splits into two independent stages. Only the second one involves Cl
 
 - **Word problems** — schema would extend via a `problemType` field; RAG becomes genuinely useful for retrieving conceptually similar word problems where topic tags are too coarse.
 - **LangGraph** — reserved for an agentic Phase 3 (multi-step reasoning across tools: tutor + setter + verifier + planner). Current single-shot tool-use calls don't need a framework.
-- **Azure AI Search** — migration target when moving beyond local ChromaDB. The vector store interface is small enough to swap cleanly.
+- **Azure AI Search** — vector store for the planned RAG feature (replaces the deleted ChromaDB code). The vector store interface is small enough to swap cleanly.
 - **History-aware hints** — RAG-based: retrieve problems the student solved correctly that are similar to the one they're stuck on, ground the hint in that prior success.
