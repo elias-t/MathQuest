@@ -1,13 +1,7 @@
 from fastapi import FastAPI
 from dotenv import load_dotenv
 
-# The RAG router is intentionally NOT registered here. ChromaDB was removed
-# because it doesn't fit Azure App Service's Free tier (heavy ML deps for
-# in-process embeddings, an out-of-date system sqlite3, and CPU-quota burn on
-# every build/cold-start). The rag/ package and app/routers/rag.py remain in
-# the repo for reference; RAG will be re-implemented on Azure AI Search (managed
-# vector store + API embeddings) when the confusion-search feature is built.
-# See CLAUDE.md → "RAG: Parked, Not Removed".
+# RAG/ChromaDB was removed (it did not fit Azure App Service F1); see git history.
 from app.routers import validation, hints, generation
 
 load_dotenv()
