@@ -282,7 +282,7 @@ RAG (ChromaDB + semantic recommendation) was implemented end-to-end, but was dro
 
 The pipeline splits into two independent stages. Only the second one involves Claude — the first is a plain vector search with no LLM call:
 
-1. **Retrieval — no prompt, no Claude.** Build this on Azure AI Search (the old `chroma_client.problems_collection` and `rag/retrieval.py::query_problems()` were deleted; see git history at 7d63587). Add a new function that embeds the student's freeform sentence directly instead of a topic keyword, and drops the topic `where` filter so it searches the whole bank by embedding distance:
+1. **Retrieval — no prompt, no Claude.** Build this on Azure AI Search (the old `chroma_client.problems_collection` and `rag/retrieval.py::query_problems()` were deleted; see git history at 7d63587). Add a new function that embeds the student's freeform sentence directly instead of a topic keyword, and drops the topic `where` filter so it searches the whole bank by embedding distance. The snippet below is illustrative ChromaDB-style pseudocode; swap in the Azure AI Search client when building it:
    ```python
    def query_by_text(student_query: str, n_results: int = 5) -> list[dict]:
        count = problems_collection.count()
@@ -293,7 +293,7 @@ The pipeline splits into two independent stages. Only the second one involves Cl
            n_results=min(n_results, count),
            # no `where` — search across all topics, ranked by similarity alone
        )
-       # ...same candidate-building loop as query_problems()
+       # ...build the candidate list (id, title, topic, difficulty, description) from the results
    ```
    The old topic-scoped `query_problems()` is gone (see git history); this is a new function.
 
